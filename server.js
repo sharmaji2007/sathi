@@ -56,8 +56,8 @@ app.post('/api/chat', async (req, res) => {
       temperature: 0.7
     });
 
-    const text = response.choices?.[0]?.message?.content || '';
-    res.json({ text });
+    const reply = response.choices?.[0]?.message?.content || '';
+    res.json({ reply });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Chat failed' });
