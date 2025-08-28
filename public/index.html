@@ -343,7 +343,7 @@
                             <div class="aspect-video w-full overflow-hidden rounded-lg">
                                 <iframe class="w-full h-full" src="https://www.youtube.com/embed/oQ6NfFIr2jw" title="Surya Namaskar" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
                             </div>
-                            <img class="w-full rounded-lg mt-3" alt="Surya Namaskar Steps" src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/43/Surya_Namaskar.jpg/640px-Surya_Namaskar.jpg" />
+                            <img class="w-full rounded-lg mt-3" alt="Surya Namaskar Steps" src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/43/Surya_Namaskar.jpg/640px-Surya_Namaskar.jpg" onerror="this.src='https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=640&h=480&fit=crop'" />
                         </div>
                         
                         <!-- Benefits -->
@@ -1563,23 +1563,43 @@
             messagesContainer.appendChild(userMessage);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
             input.value = '';
+            
+            // Show loading message
+            const loadingMessage = document.createElement('div');
+            loadingMessage.className = 'chat-message ai-message';
+            loadingMessage.innerHTML = '<p>🤔 Thinking...</p>';
+            messagesContainer.appendChild(loadingMessage);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            
             try {
                 const res = await fetch('/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ message: text })
                 });
+                
+                // Remove loading message
+                messagesContainer.removeChild(loadingMessage);
+                
                 const data = await res.json();
                 const aiMessage = document.createElement('div');
                 aiMessage.className = 'chat-message ai-message';
-                aiMessage.innerHTML = `<p>${(data && data.text) || 'Sorry, I had trouble responding.'}</p>`;
+                aiMessage.innerHTML = `<p>${(data && data.reply) || 'I understand you\'re reaching out. How can I help you today?'}</p>`;
                 messagesContainer.appendChild(aiMessage);
                 messagesContainer.scrollTop = messagesContainer.scrollHeight;
             } catch (e) {
+                console.error('Chat error:', e);
+                
+                // Remove loading message if it exists
+                if (loadingMessage && loadingMessage.parentNode) {
+                    messagesContainer.removeChild(loadingMessage);
+                }
+                
                 const aiMessage = document.createElement('div');
                 aiMessage.className = 'chat-message ai-message';
-                aiMessage.innerHTML = `<p>Something went wrong. Please try again.</p>`;
+                aiMessage.innerHTML = `<p>I'm having trouble connecting. Please check your internet and try again.</p>`;
                 messagesContainer.appendChild(aiMessage);
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
             }
         }
         
@@ -1620,7 +1640,8 @@
                             voicePlayer.play();
                         }
                     } catch (e) {
-                        voiceTranscript.innerHTML = '<p class="text-red-600">Voice processing failed.</p>';
+                        console.error('Voice processing error:', e);
+                        voiceTranscript.innerHTML = '<p class="text-red-600">Voice processing failed. Please try again.</p>';
                     }
                     voiceStatus.innerHTML = '<p class="text-gray-600">Click the microphone to start speaking</p>';
                 };
@@ -1640,6 +1661,32 @@
                 }
             }
         }
+        
+        // Backend status check
+        async function checkBackendStatus() {
+            try {
+                const res = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: 'test' })
+                });
+                if (res.ok) {
+                    console.log('✅ Backend is working!');
+                    return true;
+                } else {
+                    console.log('❌ Backend error:', res.status);
+                    return false;
+                }
+            } catch (e) {
+                console.log('❌ Backend connection failed:', e);
+                return false;
+            }
+        }
+        
+        // Test backend on page load
+        window.addEventListener('load', () => {
+            setTimeout(checkBackendStatus, 2000);
+        });
         
         // Nam Jap Counter functionality
         let japCount = 0;
