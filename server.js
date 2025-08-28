@@ -67,6 +67,7 @@ app.post('/api/chat', async (req, res) => {
       { role: 'user', content: message || '' }
     ];
 
+    console.log('Making OpenAI API call...');
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages,
@@ -74,6 +75,7 @@ app.post('/api/chat', async (req, res) => {
     });
 
     const reply = response.choices?.[0]?.message?.content || '';
+    console.log('OpenAI response received:', reply.substring(0, 50) + '...');
     res.json({ reply });
   } catch (err) {
     console.error('Chat API Error:', err);
