@@ -22,7 +22,11 @@ if (!process.env.OPENAI_API_KEY) {
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 app.get('/health', (req, res) => {
-  res.json({ ok: true });
+  res.json({ 
+    ok: true, 
+    hasApiKey: !!process.env.OPENAI_API_KEY,
+    apiKeyLength: process.env.OPENAI_API_KEY ? process.env.OPENAI_API_KEY.length : 0
+  });
 });
 
 // Speech-to-Text: Accepts audio (webm/ogg/wav/m4a/mp3), returns transcript text
