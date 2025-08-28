@@ -13,6 +13,12 @@ app.use(express.urlencoded({ extended: true }));
 
 const upload = multer({ dest: 'uploads/' });
 
+// Check if OpenAI API key is configured
+if (!process.env.OPENAI_API_KEY) {
+  console.error('❌ OPENAI_API_KEY environment variable is not set!');
+  console.error('Please set your OpenAI API key in Render environment variables.');
+}
+
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 app.get('/health', (req, res) => {
@@ -44,6 +50,13 @@ app.post('/api/stt', upload.single('audio'), async (req, res) => {
 // Chat: Accepts {message, history}, returns assistant text
 app.post('/api/chat', async (req, res) => {
   try {
+    if (!process.env.OPENAI_API_KEY) {
+      return res.status(500).json({ 
+        error: 'OpenAI API key not configured. Please set OPENAI_API_KEY in environment variables.',
+        reply: 'I apologize, but I cannot respond right now. The AI service is not properly configured. Please contact the administrator.'
+      });
+    }
+
     const { message, history } = req.body || {};
     const messages = [
       ...(Array.isArray(history) ? history : []),
@@ -59,8 +72,11 @@ app.post('/api/chat', async (req, res) => {
     const reply = response.choices?.[0]?.message?.content || '';
     res.json({ reply });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Chat failed' });
+    console.error('Chat API Error:', err);
+    res.status(500).json({ 
+      error: 'Chat failed', 
+      reply: 'I apologize, but I encountered an error. Please try again later.'
+    });
   }
 });
 
