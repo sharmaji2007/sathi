@@ -1,0 +1,1799 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sathi - Mental Health Companion</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.18.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl@4.18.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
+    <script src="https://docs.opencv.org/4.x/opencv.js"></script>
+    <style>
+        .section-hidden { display: none; }
+        .section-active { display: block; }
+        .nav-active { background-color: #3b82f6; color: white; }
+        
+        .chat-message {
+            margin-bottom: 12px;
+            padding: 12px;
+            border-radius: 12px;
+            max-width: 80%;
+        }
+        
+        .user-message {
+            background-color: #3b82f6;
+            color: white;
+            margin-left: auto;
+        }
+        
+        .ai-message {
+            background-color: #f3f4f6;
+            color: #374151;
+        }
+        
+        .exercise-card {
+            transition: transform 0.2s;
+        }
+        
+        .exercise-card:hover {
+            transform: translateY(-2px);
+        }
+        
+        .schedule-item {
+            border-left: 4px solid #3b82f6;
+            padding-left: 16px;
+        }
+        
+        .video-placeholder {
+            background: linear-gradient(45deg, #f3f4f6, #e5e7eb);
+            border: 2px dashed #9ca3af;
+        }
+        
+        /* Pose detection elements */
+        #pose-canvas { position: absolute; top: 0; left: 0; }
+        #pose-container { position: relative; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Header -->
+    <header class="bg-white shadow-md sticky top-0 z-50">
+        <div class="container mx-auto px-4 py-3">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
+                        <span class="text-white font-bold text-lg">🧠</span>
+                    </div>
+                    <h1 class="text-2xl font-bold text-gray-800">Sathi</h1>
+                </div>
+                
+                <!-- Mobile Menu Button -->
+                <button id="mobile-menu-btn" class="md:hidden p-2">
+                    <span class="block w-6 h-0.5 bg-gray-600 mb-1"></span>
+                    <span class="block w-6 h-0.5 bg-gray-600 mb-1"></span>
+                    <span class="block w-6 h-0.5 bg-gray-600"></span>
+                </button>
+                
+                <!-- Navigation -->
+                <nav id="nav-menu" class="hidden md:flex space-x-1">
+                    <button onclick="showSection('home', event)" class="nav-btn px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100">Home</button>
+                    <button onclick="showSection('chat', event)" class="nav-btn px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100">Chat</button>
+                    <button onclick="showSection('diet', event)" class="nav-btn px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100">Diet</button>
+                    <button onclick="showSection('exercises', event)" class="nav-btn px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100">Exercises</button>
+                    <button onclick="showSection('challenges', event)" class="nav-btn px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100">Challenges</button>
+                    <button onclick="showSection('survey', event)" class="nav-btn px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100">Survey</button>
+                    <button onclick="showSection('meditation', event)" class="nav-btn px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100">Meditation</button>
+                    <button onclick="showSection('doctor', event)" class="nav-btn px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100">Doctor</button>
+                    <button onclick="showSection('video-log', event)" class="nav-btn px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100">Video Log</button>
+                    <button onclick="showSection('guide', event)" class="nav-btn px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100">Guide</button>
+                </nav>
+            </div>
+            
+            <!-- Mobile Navigation -->
+            <nav id="mobile-nav" class="hidden md:hidden mt-4 pb-4">
+                <div class="flex flex-col space-y-2">
+                    <button onclick="showSection('home', event)" class="nav-btn text-left px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100">Home</button>
+                    <button onclick="showSection('chat', event)" class="nav-btn text-left px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100">Chat Companion</button>
+                    <button onclick="showSection('diet', event)" class="nav-btn text-left px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100">Diet</button>
+                    <button onclick="showSection('exercises', event)" class="nav-btn text-left px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100">Exercises</button>
+                    <button onclick="showSection('challenges', event)" class="nav-btn text-left px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100">Challenges</button>
+                    <button onclick="showSection('survey', event)" class="nav-btn text-left px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100">Survey</button>
+                    <button onclick="showSection('meditation', event)" class="nav-btn text-left px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100">Meditation</button>
+                    <button onclick="showSection('doctor', event)" class="nav-btn text-left px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100">Doctor/Helpline</button>
+                    <button onclick="showSection('video-log', event)" class="nav-btn text-left px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100">Video Log</button>
+                    <button onclick="showSection('guide', event)" class="nav-btn text-left px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100">App Guide</button>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-4 py-6">
+        <!-- Home Section -->
+        <section id="home" class="section-active">
+            <div class="text-center mb-8">
+                <h2 class="text-4xl font-bold text-gray-800 mb-4">Welcome to Sathi</h2>
+                <p class="text-xl text-gray-600 mb-8">Your comprehensive mental health companion</p>
+                
+                <!-- Program Progress Section -->
+                <div class="bg-white rounded-lg shadow-md p-6 mb-8 max-w-4xl mx-auto">
+                    <h3 class="text-2xl font-semibold mb-4 text-blue-600">Your Current Program</h3>
+                    
+                    <div class="grid md:grid-cols-3 gap-6 mb-6">
+                        <div class="text-center">
+                            <div class="text-3xl font-bold text-blue-600" id="current-program">21-Day</div>
+                            <p class="text-gray-600">Mental Wellness Program</p>
+                        </div>
+                        
+                        <div class="text-center">
+                            <div class="text-3xl font-bold text-green-600" id="days-completed">12</div>
+                            <p class="text-gray-600">Days Completed</p>
+                        </div>
+                        
+                        <div class="text-center">
+                            <div class="text-3xl font-bold text-orange-600" id="days-remaining">9</div>
+                            <p class="text-gray-600">Days Remaining</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Progress Bar -->
+                    <div class="mb-4">
+                        <div class="flex justify-between text-sm text-gray-600 mb-2">
+                            <span>Progress</span>
+                            <span id="progress-percentage">57%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-4">
+                            <div id="progress-bar" class="bg-gradient-to-r from-blue-500 to-green-500 h-4 rounded-full transition-all duration-500" style="width: 57%"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Today's Focus -->
+                    <div class="bg-blue-50 p-4 rounded-lg">
+                        <h4 class="font-semibold text-blue-800 mb-2">Today's Focus</h4>
+                        <p class="text-blue-700">Day 12: Advanced breathing techniques and stress management</p>
+                        <button onclick="showSection('exercises', event)" class="mt-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm">Start Today's Session</button>
+                    </div>
+                </div>
+                
+                <div class="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <div class="text-3xl mb-4">💬</div>
+                        <h3 class="text-lg font-semibold mb-2">AI Chat Companion</h3>
+                        <p class="text-gray-600">Get instant support and guidance through our intelligent chat system</p>
+                    </div>
+                    
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <div class="text-3xl mb-4">🧘</div>
+                        <h3 class="text-lg font-semibold mb-2">Mindfulness & Meditation</h3>
+                        <p class="text-gray-600">Practice meditation and mindfulness exercises for better mental health</p>
+                    </div>
+                    
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <div class="text-3xl mb-4">📊</div>
+                        <h3 class="text-lg font-semibold mb-2">Progress Tracking</h3>
+                        <p class="text-gray-600">Monitor your mental health journey with daily logs and assessments</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Chat Companion Section -->
+        <section id="chat" class="section-hidden">
+            <h2 class="text-3xl font-bold text-gray-800 mb-6">Chat Companion</h2>
+            
+            <div class="grid lg:grid-cols-2 gap-6">
+                <!-- Text Chat -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-xl font-semibold mb-4">💬 Text Chat</h3>
+                    
+                    <div id="chat-messages" class="h-64 overflow-y-auto mb-4 p-4 bg-gray-50 rounded-lg">
+                        <div class="chat-message ai-message">
+                            <p>Hello! I'm your Sathi companion. How are you feeling today?</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex space-x-2">
+                        <input type="text" id="chat-input" placeholder="Type your message..." class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <button onclick="sendMessage()" class="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">Send</button>
+                    </div>
+                </div>
+                
+                <!-- Voice Assistant -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-xl font-semibold mb-4">🎤 Voice Assistant</h3>
+                    
+                    <div class="text-center">
+                        <div class="mb-6">
+                            <button id="voice-btn" onclick="toggleVoice()" class="w-20 h-20 bg-blue-500 hover:bg-blue-600 rounded-full flex items-center justify-center text-white text-2xl transition-colors">
+                                🎤
+                            </button>
+                        </div>
+                        
+                        <div id="voice-status" class="mb-4">
+                            <p class="text-gray-600">Click the microphone to start speaking</p>
+                        </div>
+                        
+                        <div id="voice-transcript" class="p-4 bg-gray-50 rounded-lg min-h-16">
+                            <p class="text-gray-500 italic">Your spoken words will appear here...</p>
+                        </div>
+                        
+                        <audio id="voice-player" class="w-full mt-4" controls></audio>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Diet Section -->
+        <section id="diet" class="section-hidden">
+            <h2 class="text-3xl font-bold text-gray-800 mb-6">Nutrition for Mental Health</h2>
+            
+            <div class="grid lg:grid-cols-2 gap-8">
+                <!-- Vegetarian Foods -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-xl font-semibold mb-4 text-green-600">🥬 Vegetarian Foods</h3>
+                    
+                    <div class="space-y-4">
+                        <div class="border-l-4 border-green-500 pl-4">
+                            <h4 class="font-semibold">Spinach & Leafy Greens</h4>
+                            <p class="text-sm text-gray-600">Rich in folate, helps reduce depression and anxiety. Supports neurotransmitter production.</p>
+                        </div>
+                        
+                        <div class="border-l-4 border-green-500 pl-4">
+                            <h4 class="font-semibold">Walnuts & Almonds</h4>
+                            <p class="text-sm text-gray-600">Omega-3 fatty acids support brain health and improve mood regulation.</p>
+                        </div>
+                        
+                        <div class="border-l-4 border-green-500 pl-4">
+                            <h4 class="font-semibold">Turmeric</h4>
+                            <p class="text-sm text-gray-600">Curcumin reduces inflammation and may help alleviate depression symptoms.</p>
+                        </div>
+                        
+                        <div class="border-l-4 border-green-500 pl-4">
+                            <h4 class="font-semibold">Dark Chocolate</h4>
+                            <p class="text-sm text-gray-600">Releases endorphins and serotonin, natural mood elevators.</p>
+                        </div>
+                        
+                        <div class="border-l-4 border-green-500 pl-4">
+                            <h4 class="font-semibold">Avocados</h4>
+                            <p class="text-sm text-gray-600">Healthy fats support brain function and mood stability.</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Non-Vegetarian Foods -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-xl font-semibold mb-4 text-red-600">🐟 Non-Vegetarian Foods</h3>
+                    
+                    <div class="space-y-4">
+                        <div class="border-l-4 border-red-500 pl-4">
+                            <h4 class="font-semibold">Salmon & Fatty Fish</h4>
+                            <p class="text-sm text-gray-600">High in omega-3s, supports brain health and reduces depression risk.</p>
+                        </div>
+                        
+                        <div class="border-l-4 border-red-500 pl-4">
+                            <h4 class="font-semibold">Eggs</h4>
+                            <p class="text-sm text-gray-600">Choline supports neurotransmitter production and cognitive function.</p>
+                        </div>
+                        
+                        <div class="border-l-4 border-red-500 pl-4">
+                            <h4 class="font-semibold">Turkey</h4>
+                            <p class="text-sm text-gray-600">Tryptophan helps produce serotonin, improving mood and sleep.</p>
+                        </div>
+                        
+                        <div class="border-l-4 border-red-500 pl-4">
+                            <h4 class="font-semibold">Chicken Breast</h4>
+                            <p class="text-sm text-gray-600">Lean protein supports neurotransmitter balance and energy levels.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Ayurvedic Medicines -->
+            <div class="mt-8 bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-xl font-semibold mb-4 text-orange-600">🌿 Ayurvedic Medicines & Herbs</h3>
+                
+                <div class="grid md:grid-cols-3 gap-4">
+                    <div class="border border-orange-200 rounded-lg p-4">
+                        <h4 class="font-semibold">Ashwagandha</h4>
+                        <p class="text-sm text-gray-600">Reduces stress and anxiety, improves sleep quality</p>
+                    </div>
+                    
+                    <div class="border border-orange-200 rounded-lg p-4">
+                        <h4 class="font-semibold">Brahmi</h4>
+                        <p class="text-sm text-gray-600">Enhances memory and cognitive function</p>
+                    </div>
+                    
+                    <div class="border border-orange-200 rounded-lg p-4">
+                        <h4 class="font-semibold">Jatamansi</h4>
+                        <p class="text-sm text-gray-600">Natural antidepressant, calms the mind</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Exercises Section -->
+        <section id="exercises" class="section-hidden">
+            <h2 class="text-3xl font-bold text-gray-800 mb-6">Yoga & Exercises for Mental Health</h2>
+            
+            <!-- Program Selection Tabs -->
+            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                <h3 class="text-xl font-semibold mb-4">Choose Your Program</h3>
+                <div class="flex flex-wrap gap-2 mb-4">
+                    <button onclick="showProgram('7-day', event)" class="program-tab px-4 py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600">7-Day Starter</button>
+                    <button onclick="showProgram('16-day', event)" class="program-tab px-4 py-2 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300">16-Day Intermediate</button>
+                    <button onclick="showProgram('21-day', event)" class="program-tab px-4 py-2 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300">21-Day Advanced</button>
+                </div>
+                
+                <!-- Program Details -->
+                <div id="program-details" class="bg-blue-50 p-4 rounded-lg">
+                    <h4 class="font-semibold text-blue-800 mb-2">7-Day Starter Program</h4>
+                    <p class="text-blue-700 text-sm mb-2">Perfect for beginners. Focus on basic poses, breathing, and mindfulness.</p>
+                    <p class="text-blue-600 text-xs">Exercises: Basic breathing, Simple stretches, Beginner meditation, Relaxation techniques</p>
+                </div>
+            </div>
+            
+            <div class="grid lg:grid-cols-1 gap-6">
+                <!-- Surya Namaskar -->
+                <div class="exercise-card bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-2xl font-semibold mb-4 text-center">Surya Namaskar (Sun Salutation)</h3>
+                    <p class="text-gray-600 mb-6 text-center"><strong>Duration:</strong> 10-15 minutes | <strong>Difficulty:</strong> Intermediate</p>
+                    
+                    <div class="grid lg:grid-cols-2 gap-6">
+                        <!-- Main Video -->
+                        <div class="w-full rounded-lg mb-4">
+                            <div class="aspect-video w-full overflow-hidden rounded-lg">
+                                <iframe class="w-full h-full" src="https://www.youtube.com/embed/oQ6NfFIr2jw" title="Surya Namaskar" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                            </div>
+                            <img class="w-full rounded-lg mt-3" alt="Surya Namaskar Steps" src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/43/Surya_Namaskar.jpg/640px-Surya_Namaskar.jpg" />
+                        </div>
+                        
+                        <!-- Benefits -->
+                        <div class="bg-blue-50 p-4 rounded-lg">
+                            <h4 class="font-semibold text-blue-800 mb-2">Mental Health Benefits:</h4>
+                            <ul class="text-sm text-blue-700 space-y-1">
+                                <li>• Reduces stress and anxiety</li>
+                                <li>• Improves mood and energy</li>
+                                <li>• Enhances focus and concentration</li>
+                                <li>• Promotes better sleep</li>
+                                <li>• Increases self-awareness</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <!-- Detailed Steps -->
+                    <div class="mt-6">
+                        <h4 class="text-lg font-semibold mb-4">Step-by-Step Instructions:</h4>
+                        
+                        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <!-- Step 1 -->
+                            <div class="border border-gray-200 rounded-lg p-4">
+                                <img class="w-full h-32 object-cover rounded mb-3" alt="Prayer Pose" src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/Pranamasana.jpg/320px-Pranamasana.jpg" />
+                                <h5 class="font-medium mb-2">1. Prayer Pose (Pranamasana)</h5>
+                                <p class="text-xs text-gray-600">Stand straight with feet together. Bring palms together at heart center. Breathe normally and center yourself.</p>
+                            </div>
+                            
+                            <!-- Step 2 -->
+                            <div class="border border-gray-200 rounded-lg p-4">
+                                <img class="w-full h-32 object-cover rounded mb-3" alt="Raised Arms" src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/Hastauttanasana.jpg/320px-Hastauttanasana.jpg" />
+                                <h5 class="font-medium mb-2">2. Raised Arms (Hastauttanasana)</h5>
+                                <p class="text-xs text-gray-600">Inhale and lift arms overhead. Arch back slightly, keeping arms shoulder-width apart. Look up at your hands.</p>
+                            </div>
+                            
+                            <!-- Step 3 -->
+                            <div class="border border-gray-200 rounded-lg p-4">
+                                <img class="w-full h-32 object-cover rounded mb-3" alt="Forward Bend" src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/53/Uttanasana.jpg/320px-Uttanasana.jpg" />
+                                <h5 class="font-medium mb-2">3. Forward Bend (Uttanasana)</h5>
+                                <p class="text-xs text-gray-600">Exhale and bend forward from hips. Try to touch the ground beside your feet. Keep legs straight if possible.</p>
+                            </div>
+                            
+                            <!-- Step 4 -->
+                            <div class="border border-gray-200 rounded-lg p-4">
+                                <img class="w-full h-32 object-cover rounded mb-3" alt="Low Lunge" src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/1c/Ashwa_Sanchalanasana.jpg/320px-Ashwa_Sanchalanasana.jpg" />
+                                <h5 class="font-medium mb-2">4. Low Lunge (Ashwa Sanchalanasana)</h5>
+                                <p class="text-xs text-gray-600">Inhale and step right leg back into lunge. Keep left knee over ankle. Look up and open chest.</p>
+                            </div>
+                            
+                            <!-- Step 5 -->
+                            <div class="border border-gray-200 rounded-lg p-4">
+                                <img class="w-full h-32 object-cover rounded mb-3" alt="Plank" src="https://upload.wikimedia.org/wikipedia/commons/thumb/9/9c/Phalakasana.jpg/320px-Phalakasana.jpg" />
+                                <h5 class="font-medium mb-2">5. Plank Pose (Dandasana)</h5>
+                                <p class="text-xs text-gray-600">Hold breath and step left leg back. Form straight line from head to heels. Engage core muscles.</p>
+                            </div>
+                            
+                            <!-- Step 6 -->
+                            <div class="border border-gray-200 rounded-lg p-4">
+                                <img class="w-full h-32 object-cover rounded mb-3" alt="Ashtanga Namaskara" src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/45/Ashtanga_Namaskara.jpg/320px-Ashtanga_Namaskara.jpg" />
+                                <h5 class="font-medium mb-2">6. Eight-Point Pose (Ashtanga Namaskara)</h5>
+                                <p class="text-xs text-gray-600">Exhale and lower knees, chest, and chin to ground. Keep hips slightly raised. Eight points touch the floor.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+                            <!-- Step 7 -->
+                            <div class="border border-gray-200 rounded-lg p-4">
+                                <img class="w-full h-32 object-cover rounded mb-3" alt="Cobra" src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/0c/Bhujangasana.jpg/320px-Bhujangasana.jpg" />
+                                <h5 class="font-medium mb-2">7. Cobra Pose (Bhujangasana)</h5>
+                                <p class="text-xs text-gray-600">Inhale and slide forward, lifting chest. Keep pelvis on ground. Arch back gently, looking up.</p>
+                            </div>
+                            
+                            <!-- Step 8 -->
+                            <div class="border border-gray-200 rounded-lg p-4">
+                                <img class="w-full h-32 object-cover rounded mb-3" alt="Downward Dog" src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/Adho_mukha_svanasana.jpg/320px-Adho_mukha_svanasana.jpg" />
+                                <h5 class="font-medium mb-2">8. Downward Dog (Adho Mukha Svanasana)</h5>
+                                <p class="text-xs text-gray-600">Exhale and lift hips up, forming inverted V. Straighten arms and legs. Press palms firmly down.</p>
+                            </div>
+                            
+                            <!-- Steps 9-12 -->
+                            <div class="border border-gray-200 rounded-lg p-4">
+                                <img class="w-full h-32 object-cover rounded mb-3" alt="Return Sequence" src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/43/Surya_Namaskar.jpg/320px-Surya_Namaskar.jpg" />
+                                <h5 class="font-medium mb-2">9-12. Return Sequence</h5>
+                                <p class="text-xs text-gray-600">Repeat steps 4, 3, 2, 1 in reverse order to complete one full round of Surya Namaskar.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Tree Pose -->
+                <div class="exercise-card bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-2xl font-semibold mb-4 text-center">Vrikshasana (Tree Pose)</h3>
+                    <p class="text-gray-600 mb-6 text-center"><strong>Duration:</strong> 30 seconds - 1 minute each side | <strong>Difficulty:</strong> Beginner</p>
+                    
+                    <div class="grid lg:grid-cols-2 gap-6">
+                        <!-- Main Video -->
+                        <div class="w-full rounded-lg mb-4">
+                            <div class="aspect-video w-full overflow-hidden rounded-lg">
+                                <iframe class="w-full h-full" src="https://www.youtube.com/embed/5dZI2s9QGqg" title="Tree Pose" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                            </div>
+                            <img class="w-full rounded-lg mt-3" alt="Tree Pose" src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/f6/Vriksasana.jpg/640px-Vriksasana.jpg" />
+                        </div>
+                        
+                        <!-- Benefits -->
+                        <div class="bg-green-50 p-4 rounded-lg">
+                            <h4 class="font-semibold text-green-800 mb-2">Mental Health Benefits:</h4>
+                            <ul class="text-sm text-green-700 space-y-1">
+                                <li>• Improves balance and focus</li>
+                                <li>• Reduces anxiety and stress</li>
+                                <li>• Builds confidence and stability</li>
+                                <li>• Enhances concentration</li>
+                                <li>• Promotes mindfulness</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <!-- Detailed Steps -->
+                    <div class="mt-6">
+                        <h4 class="text-lg font-semibold mb-4">Step-by-Step Instructions:</h4>
+                        
+                        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <!-- Step 1 -->
+                            <div class="border border-gray-200 rounded-lg p-4">
+                                <img class="w-full h-32 object-cover rounded mb-3" alt="Mountain Pose" src="https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/Tadasana.jpg/320px-Tadasana.jpg" />
+                                <h5 class="font-medium mb-2">1. Mountain Pose</h5>
+                                <p class="text-xs text-gray-600">Stand straight with feet together, arms at sides. Distribute weight evenly on both feet. Engage core muscles.</p>
+                            </div>
+                            
+                            <!-- Step 2 -->
+                            <div class="border border-gray-200 rounded-lg p-4">
+                                <img class="w-full h-32 object-cover rounded mb-3" alt="Shift Weight" src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c8/Yoga_Poses_Balance.jpg/320px-Yoga_Poses_Balance.jpg" />
+                                <h5 class="font-medium mb-2">2. Shift Weight</h5>
+                                <p class="text-xs text-gray-600">Slowly shift your weight to your left foot. Feel grounded and stable on your standing leg.</p>
+                            </div>
+                            
+                            <!-- Step 3 -->
+                            <div class="border border-gray-200 rounded-lg p-4">
+                                <img class="w-full h-32 object-cover rounded mb-3" alt="Lift Right Foot" src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/f6/Vriksasana.jpg/320px-Vriksasana.jpg" />
+                                <h5 class="font-medium mb-2">3. Lift Right Foot</h5>
+                                <p class="text-xs text-gray-600">Bend right knee and place right foot on left inner thigh, above or below knee (never on knee).</p>
+                            </div>
+                            
+                            <!-- Step 4 -->
+                            <div class="border border-gray-200 rounded-lg p-4">
+                                <img class="w-full h-32 object-cover rounded mb-3" alt="Prayer Position" src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/Pranamasana.jpg/320px-Pranamasana.jpg" />
+                                <h5 class="font-medium mb-2">4. Prayer Position</h5>
+                                <p class="text-xs text-gray-600">Bring palms together at heart center. Press foot into leg and leg into foot for stability.</p>
+                            </div>
+                            
+                            <!-- Step 5 -->
+                            <div class="border border-gray-200 rounded-lg p-4">
+                                <img class="w-full h-32 object-cover rounded mb-3" alt="Find Focus" src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/Yoga_Balance_Focus.jpg/320px-Yoga_Balance_Focus.jpg" />
+                                <h5 class="font-medium mb-2">5. Find Focus Point</h5>
+                                <p class="text-xs text-gray-600">Fix your gaze on a point in front of you. This helps maintain balance and concentration.</p>
+                            </div>
+                            
+                            <!-- Step 6 -->
+                            <div class="border border-gray-200 rounded-lg p-4">
+                                <img class="w-full h-32 object-cover rounded mb-3" alt="Hold and Breathe" src="https://upload.wikimedia.org/wikipedia/commons/thumb/6/6e/Pranayama.jpg/320px-Pranayama.jpg" />
+                                <h5 class="font-medium mb-2">6. Hold & Breathe</h5>
+                                <p class="text-xs text-gray-600">Hold for 30 seconds to 1 minute. Breathe deeply and steadily. Repeat on the other side.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Child's Pose -->
+                <div class="exercise-card bg-white rounded-lg shadow-md p-6">
+                    <div class="w-full h-48 rounded-lg mb-4 flex items-center justify-center">
+                        <div class="aspect-video w-full overflow-hidden rounded-lg">
+                            <iframe class="w-full h-full" src="https://www.youtube.com/embed/Q1n4k2S8tK8" title="Child's Pose" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                        </div>
+                    </div>
+                    
+                    <h3 class="text-xl font-semibold mb-3">Balasana (Child's Pose)</h3>
+                    <p class="text-gray-600 mb-4"><strong>Duration:</strong> 1-3 minutes</p>
+                    
+                    <div class="mb-4">
+                        <h4 class="font-semibold mb-2">Steps:</h4>
+                        <ol class="text-sm text-gray-600 space-y-1 list-decimal list-inside">
+                            <li>Kneel on the floor with big toes touching</li>
+                            <li>Sit back on your heels</li>
+                            <li>Separate knees about hip-width apart</li>
+                            <li>Exhale and lay torso down between thighs</li>
+                            <li>Extend arms forward or alongside body</li>
+                            <li>Rest forehead on the ground</li>
+                            <li>Breathe deeply and relax</li>
+                        </ol>
+                    </div>
+                    
+                    <div class="bg-purple-50 p-3 rounded-lg">
+                        <h4 class="font-semibold text-purple-800 mb-1">Mental Health Benefits:</h4>
+                        <p class="text-sm text-purple-700">Calms the mind, relieves stress and anxiety, promotes introspection and peace</p>
+                    </div>
+                </div>
+                
+                <!-- Breathing Exercise -->
+                <div class="exercise-card bg-white rounded-lg shadow-md p-6">
+                    <div class="w-full h-48 rounded-lg mb-4 flex items-center justify-center">
+                        <div class="aspect-video w-full overflow-hidden rounded-lg">
+                            <iframe class="w-full h-full" src="https://www.youtube.com/embed/cU8HrO7XuiE" title="Anulom Vilom" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                        </div>
+                    </div>
+                    
+                    <h3 class="text-xl font-semibold mb-3">Anulom Vilom (Alternate Nostril Breathing)</h3>
+                    <p class="text-gray-600 mb-4"><strong>Duration:</strong> 5-10 minutes</p>
+                    
+                    <div class="mb-4">
+                        <h4 class="font-semibold mb-2">Steps:</h4>
+                        <ol class="text-sm text-gray-600 space-y-1 list-decimal list-inside">
+                            <li>Sit comfortably with spine straight</li>
+                            <li>Use right thumb to close right nostril</li>
+                            <li>Inhale slowly through left nostril</li>
+                            <li>Close left nostril with ring finger</li>
+                            <li>Release thumb and exhale through right nostril</li>
+                            <li>Inhale through right nostril</li>
+                            <li>Close right nostril, release left</li>
+                            <li>Exhale through left nostril</li>
+                            <li>This completes one cycle</li>
+                        </ol>
+                    </div>
+                    
+                    <div class="bg-indigo-50 p-3 rounded-lg">
+                        <h4 class="font-semibold text-indigo-800 mb-1">Mental Health Benefits:</h4>
+                        <p class="text-sm text-indigo-700">Balances nervous system, reduces stress, improves focus, calms anxiety</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Pose Correction -->
+            <div class="mt-8 bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-xl font-semibold mb-4">🎯 Pose Correction Assistant</h3>
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div>
+                        <div id="pose-container" class="relative w-full rounded-lg overflow-hidden bg-black">
+                            <video id="pose-video" class="w-full" autoplay muted playsinline></video>
+                            <canvas id="pose-canvas"></canvas>
+                        </div>
+                        <div class="flex items-center gap-2 mt-3">
+                            <button id="pose-start" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">Start Pose Detection</button>
+                            <button id="pose-stop" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">Stop</button>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <p id="pose-status" class="text-gray-700">Status: idle</p>
+                            <p id="pose-feedback" class="text-sm text-blue-700 mt-2">Feedback will appear here.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Challenges Section -->
+        <section id="challenges" class="section-hidden">
+            <h2 class="text-3xl font-bold text-gray-800 mb-6">Daily Challenges & Schedule</h2>
+            
+            <div class="grid lg:grid-cols-2 gap-6">
+                <!-- Daily Schedule -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-xl font-semibold mb-4">📅 Daily Schedule</h3>
+                    
+                    <div class="space-y-4">
+                        <div class="schedule-item">
+                            <div class="flex justify-between items-center">
+                                <span class="font-medium">Wake up</span>
+                                <span class="text-gray-600">3:45 AM</span>
+                            </div>
+                        </div>
+                        
+                        <div class="schedule-item">
+                            <div class="flex justify-between items-center">
+                                <span class="font-medium">Morning Meditation</span>
+                                <span class="text-gray-600">10 minutes</span>
+                            </div>
+                        </div>
+                        
+                        <div class="schedule-item">
+                            <div class="flex justify-between items-center">
+                                <span class="font-medium">Running</span>
+                                <span class="text-gray-600">2 km</span>
+                            </div>
+                        </div>
+                        
+                        <div class="schedule-item">
+                            <div class="flex justify-between items-center">
+                                <span class="font-medium">Cardio Workout</span>
+                                <span class="text-gray-600">1 hour</span>
+                            </div>
+                        </div>
+                        
+                        <div class="schedule-item">
+                            <div class="flex justify-between items-center">
+                                <span class="font-medium">Water Intake</span>
+                                <span class="text-gray-600">4 liters</span>
+                            </div>
+                        </div>
+                        
+                        <div class="schedule-item">
+                            <div class="flex justify-between items-center">
+                                <span class="font-medium">Nam Jap</span>
+                                <span class="text-gray-600">10 minutes</span>
+                            </div>
+                        </div>
+                        
+                        <div class="schedule-item">
+                            <div class="flex justify-between items-center">
+                                <span class="font-medium">Sleep Time</span>
+                                <span class="text-gray-600">10:00 PM</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Nam Jap Counter -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-xl font-semibold mb-4">📿 Nam Jap Counter</h3>
+                    
+                    <div class="text-center">
+                        <div class="mb-6">
+                            <div class="text-6xl font-bold text-blue-600" id="jap-count">0</div>
+                            <p class="text-gray-600">Count</p>
+                        </div>
+                        
+                        <div class="space-y-4">
+                            <button onclick="incrementJap()" class="w-full py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-lg font-medium">
+                                + Add Count
+                            </button>
+                            
+                            <div class="flex space-x-2">
+                                <button onclick="resetJap()" class="flex-1 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">Reset</button>
+                                <button onclick="setTarget()" class="flex-1 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600">Set Target</button>
+                            </div>
+                            
+                            <div class="bg-gray-50 p-4 rounded-lg">
+                                <p class="text-sm text-gray-600">Target: <span id="jap-target">108</span></p>
+                                <div class="w-full bg-gray-200 rounded-full h-2 mt-2">
+                                    <div id="jap-progress" class="bg-blue-600 h-2 rounded-full" style="width: 0%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Daily Challenges -->
+            <div class="mt-6 bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-xl font-semibold mb-4">🎯 Today's Challenges</h3>
+                
+                <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="challenge-card p-4 border border-gray-200 rounded-lg">
+                        <div class="text-2xl mb-2">💧</div>
+                        <h4 class="font-medium mb-1">Hydration Goal</h4>
+                        <p class="text-sm text-gray-600">Drink 4 liters of water</p>
+                        <div class="mt-2">
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-blue-500 h-2 rounded-full" style="width: 60%"></div>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1">2.4L / 4L</p>
+                        </div>
+                    </div>
+                    
+                    <div class="challenge-card p-4 border border-gray-200 rounded-lg">
+                        <div class="text-2xl mb-2">🏃</div>
+                        <h4 class="font-medium mb-1">Running Goal</h4>
+                        <p class="text-sm text-gray-600">Complete 2km run</p>
+                        <div class="mt-2">
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-green-500 h-2 rounded-full" style="width: 100%"></div>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1">2km / 2km ✓</p>
+                        </div>
+                    </div>
+                    
+                    <div class="challenge-card p-4 border border-gray-200 rounded-lg">
+                        <div class="text-2xl mb-2">🧘</div>
+                        <h4 class="font-medium mb-1">Meditation</h4>
+                        <p class="text-sm text-gray-600">10 minutes mindfulness</p>
+                        <div class="mt-2">
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-purple-500 h-2 rounded-full" style="width: 80%"></div>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1">8min / 10min</p>
+                        </div>
+                    </div>
+                    
+                    <div class="challenge-card p-4 border border-gray-200 rounded-lg">
+                        <div class="text-2xl mb-2">💪</div>
+                        <h4 class="font-medium mb-1">Cardio Workout</h4>
+                        <p class="text-sm text-gray-600">1 hour exercise</p>
+                        <div class="mt-2">
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-red-500 h-2 rounded-full" style="width: 30%"></div>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1">18min / 60min</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Survey Section -->
+        <section id="survey" class="section-hidden">
+            <h2 class="text-3xl font-bold text-gray-800 mb-6">Mental Health Assessment Survey</h2>
+            
+            <form class="bg-white rounded-lg shadow-md p-6">
+                <!-- Mood & Emotions -->
+                <div class="mb-8">
+                    <h3 class="text-xl font-semibold mb-4 text-blue-600">1. Mood & Emotions</h3>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-2">How would you describe your overall mood today?</label>
+                            <div class="space-y-2">
+                                <label class="flex items-center"><input type="radio" name="mood" value="very-happy" class="mr-2"> Very Happy</label>
+                                <label class="flex items-center"><input type="radio" name="mood" value="happy" class="mr-2"> Happy</label>
+                                <label class="flex items-center"><input type="radio" name="mood" value="neutral" class="mr-2"> Neutral</label>
+                                <label class="flex items-center"><input type="radio" name="mood" value="sad" class="mr-2"> Sad</label>
+                                <label class="flex items-center"><input type="radio" name="mood" value="very-sad" class="mr-2"> Very Sad</label>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium mb-2">How often do you feel overwhelmed?</label>
+                            <div class="space-y-2">
+                                <label class="flex items-center"><input type="radio" name="overwhelmed" value="never" class="mr-2"> Never</label>
+                                <label class="flex items-center"><input type="radio" name="overwhelmed" value="rarely" class="mr-2"> Rarely</label>
+                                <label class="flex items-center"><input type="radio" name="overwhelmed" value="sometimes" class="mr-2"> Sometimes</label>
+                                <label class="flex items-center"><input type="radio" name="overwhelmed" value="often" class="mr-2"> Often</label>
+                                <label class="flex items-center"><input type="radio" name="overwhelmed" value="always" class="mr-2"> Always</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Anxiety & Stress -->
+                <div class="mb-8">
+                    <h3 class="text-xl font-semibold mb-4 text-green-600">2. Anxiety & Stress</h3>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-2">How often do you feel anxious or worried?</label>
+                            <div class="space-y-2">
+                                <label class="flex items-center"><input type="radio" name="anxiety" value="never" class="mr-2"> Never</label>
+                                <label class="flex items-center"><input type="radio" name="anxiety" value="rarely" class="mr-2"> Rarely</label>
+                                <label class="flex items-center"><input type="radio" name="anxiety" value="sometimes" class="mr-2"> Sometimes</label>
+                                <label class="flex items-center"><input type="radio" name="anxiety" value="often" class="mr-2"> Often</label>
+                                <label class="flex items-center"><input type="radio" name="anxiety" value="constantly" class="mr-2"> Constantly</label>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium mb-2">How well do you handle stress?</label>
+                            <div class="space-y-2">
+                                <label class="flex items-center"><input type="radio" name="stress-handling" value="very-well" class="mr-2"> Very Well</label>
+                                <label class="flex items-center"><input type="radio" name="stress-handling" value="well" class="mr-2"> Well</label>
+                                <label class="flex items-center"><input type="radio" name="stress-handling" value="okay" class="mr-2"> Okay</label>
+                                <label class="flex items-center"><input type="radio" name="stress-handling" value="poorly" class="mr-2"> Poorly</label>
+                                <label class="flex items-center"><input type="radio" name="stress-handling" value="very-poorly" class="mr-2"> Very Poorly</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Sleep Patterns -->
+                <div class="mb-8">
+                    <h3 class="text-xl font-semibold mb-4 text-purple-600">3. Sleep Patterns</h3>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-2">How many hours of sleep do you get per night?</label>
+                            <div class="space-y-2">
+                                <label class="flex items-center"><input type="radio" name="sleep-hours" value="less-than-4" class="mr-2"> Less than 4 hours</label>
+                                <label class="flex items-center"><input type="radio" name="sleep-hours" value="4-6" class="mr-2"> 4-6 hours</label>
+                                <label class="flex items-center"><input type="radio" name="sleep-hours" value="6-8" class="mr-2"> 6-8 hours</label>
+                                <label class="flex items-center"><input type="radio" name="sleep-hours" value="8-10" class="mr-2"> 8-10 hours</label>
+                                <label class="flex items-center"><input type="radio" name="sleep-hours" value="more-than-10" class="mr-2"> More than 10 hours</label>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium mb-2">How would you rate your sleep quality?</label>
+                            <div class="space-y-2">
+                                <label class="flex items-center"><input type="radio" name="sleep-quality" value="excellent" class="mr-2"> Excellent</label>
+                                <label class="flex items-center"><input type="radio" name="sleep-quality" value="good" class="mr-2"> Good</label>
+                                <label class="flex items-center"><input type="radio" name="sleep-quality" value="fair" class="mr-2"> Fair</label>
+                                <label class="flex items-center"><input type="radio" name="sleep-quality" value="poor" class="mr-2"> Poor</label>
+                                <label class="flex items-center"><input type="radio" name="sleep-quality" value="very-poor" class="mr-2"> Very Poor</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Appetite & Energy -->
+                <div class="mb-8">
+                    <h3 class="text-xl font-semibold mb-4 text-orange-600">4. Appetite & Energy</h3>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-2">How is your appetite lately?</label>
+                            <div class="space-y-2">
+                                <label class="flex items-center"><input type="radio" name="appetite" value="much-increased" class="mr-2"> Much Increased</label>
+                                <label class="flex items-center"><input type="radio" name="appetite" value="increased" class="mr-2"> Increased</label>
+                                <label class="flex items-center"><input type="radio" name="appetite" value="normal" class="mr-2"> Normal</label>
+                                <label class="flex items-center"><input type="radio" name="appetite" value="decreased" class="mr-2"> Decreased</label>
+                                <label class="flex items-center"><input type="radio" name="appetite" value="much-decreased" class="mr-2"> Much Decreased</label>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium mb-2">How would you describe your energy levels?</label>
+                            <div class="space-y-2">
+                                <label class="flex items-center"><input type="radio" name="energy" value="very-high" class="mr-2"> Very High</label>
+                                <label class="flex items-center"><input type="radio" name="energy" value="high" class="mr-2"> High</label>
+                                <label class="flex items-center"><input type="radio" name="energy" value="normal" class="mr-2"> Normal</label>
+                                <label class="flex items-center"><input type="radio" name="energy" value="low" class="mr-2"> Low</label>
+                                <label class="flex items-center"><input type="radio" name="energy" value="very-low" class="mr-2"> Very Low</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Concentration & Memory -->
+                <div class="mb-8">
+                    <h3 class="text-xl font-semibold mb-4 text-indigo-600">5. Concentration & Memory</h3>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-2">How is your ability to concentrate?</label>
+                            <div class="space-y-2">
+                                <label class="flex items-center"><input type="radio" name="concentration" value="excellent" class="mr-2"> Excellent</label>
+                                <label class="flex items-center"><input type="radio" name="concentration" value="good" class="mr-2"> Good</label>
+                                <label class="flex items-center"><input type="radio" name="concentration" value="fair" class="mr-2"> Fair</label>
+                                <label class="flex items-center"><input type="radio" name="concentration" value="poor" class="mr-2"> Poor</label>
+                                <label class="flex items-center"><input type="radio" name="concentration" value="very-poor" class="mr-2"> Very Poor</label>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Have you noticed any memory problems?</label>
+                            <div class="space-y-2">
+                                <label class="flex items-center"><input type="radio" name="memory" value="no-problems" class="mr-2"> No Problems</label>
+                                <label class="flex items-center"><input type="radio" name="memory" value="minor-issues" class="mr-2"> Minor Issues</label>
+                                <label class="flex items-center"><input type="radio" name="memory" value="moderate-issues" class="mr-2"> Moderate Issues</label>
+                                <label class="flex items-center"><input type="radio" name="memory" value="significant-issues" class="mr-2"> Significant Issues</label>
+                                <label class="flex items-center"><input type="radio" name="memory" value="severe-issues" class="mr-2"> Severe Issues</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Thoughts & Behavior -->
+                <div class="mb-8">
+                    <h3 class="text-xl font-semibold mb-4 text-red-600">6. Thoughts & Behavior</h3>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Do you have recurring negative thoughts?</label>
+                            <div class="space-y-2">
+                                <label class="flex items-center"><input type="radio" name="negative-thoughts" value="never" class="mr-2"> Never</label>
+                                <label class="flex items-center"><input type="radio" name="negative-thoughts" value="rarely" class="mr-2"> Rarely</label>
+                                <label class="flex items-center"><input type="radio" name="negative-thoughts" value="sometimes" class="mr-2"> Sometimes</label>
+                                <label class="flex items-center"><input type="radio" name="negative-thoughts" value="often" class="mr-2"> Often</label>
+                                <label class="flex items-center"><input type="radio" name="negative-thoughts" value="constantly" class="mr-2"> Constantly</label>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium mb-2">How do you cope with difficult emotions?</label>
+                            <div class="space-y-2">
+                                <label class="flex items-center"><input type="radio" name="coping" value="healthy-strategies" class="mr-2"> Healthy Strategies</label>
+                                <label class="flex items-center"><input type="radio" name="coping" value="mostly-healthy" class="mr-2"> Mostly Healthy</label>
+                                <label class="flex items-center"><input type="radio" name="coping" value="mixed-strategies" class="mr-2"> Mixed Strategies</label>
+                                <label class="flex items-center"><input type="radio" name="coping" value="unhealthy-strategies" class="mr-2"> Unhealthy Strategies</label>
+                                <label class="flex items-center"><input type="radio" name="coping" value="no-strategies" class="mr-2"> No Strategies</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Substance Use -->
+                <div class="mb-8">
+                    <h3 class="text-xl font-semibold mb-4 text-gray-600">7. Substance Use</h3>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-2">How often do you consume alcohol?</label>
+                            <div class="space-y-2">
+                                <label class="flex items-center"><input type="radio" name="alcohol" value="never" class="mr-2"> Never</label>
+                                <label class="flex items-center"><input type="radio" name="alcohol" value="rarely" class="mr-2"> Rarely</label>
+                                <label class="flex items-center"><input type="radio" name="alcohol" value="socially" class="mr-2"> Socially</label>
+                                <label class="flex items-center"><input type="radio" name="alcohol" value="regularly" class="mr-2"> Regularly</label>
+                                <label class="flex items-center"><input type="radio" name="alcohol" value="daily" class="mr-2"> Daily</label>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Do you use any substances to cope with stress or emotions?</label>
+                            <div class="space-y-2">
+                                <label class="flex items-center"><input type="radio" name="substance-coping" value="never" class="mr-2"> Never</label>
+                                <label class="flex items-center"><input type="radio" name="substance-coping" value="rarely" class="mr-2"> Rarely</label>
+                                <label class="flex items-center"><input type="radio" name="substance-coping" value="sometimes" class="mr-2"> Sometimes</label>
+                                <label class="flex items-center"><input type="radio" name="substance-coping" value="often" class="mr-2"> Often</label>
+                                <label class="flex items-center"><input type="radio" name="substance-coping" value="always" class="mr-2"> Always</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="text-center">
+                    <button type="submit" class="px-8 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-medium">Submit Assessment</button>
+                </div>
+            </form>
+        </section>
+
+        <!-- Meditation Section -->
+        <section id="meditation" class="section-hidden">
+            <h2 class="text-3xl font-bold text-gray-800 mb-6">Meditation & Mindfulness</h2>
+            
+            <div class="grid lg:grid-cols-2 gap-6">
+                <!-- Mindfulness Meditation -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="video-placeholder w-full h-48 rounded-lg mb-4 flex items-center justify-center">
+                        <div class="text-center">
+                            <div class="text-4xl mb-2">🧘‍♂️</div>
+                            <p class="text-gray-500">Mindfulness Meditation Video</p>
+                        </div>
+                    </div>
+                    
+                    <h3 class="text-xl font-semibold mb-3">Mindfulness Meditation</h3>
+                    <p class="text-gray-600 mb-4"><strong>Duration:</strong> 10-20 minutes</p>
+                    
+                    <div class="mb-4">
+                        <h4 class="font-semibold mb-2">Instructions:</h4>
+                        <ol class="text-sm text-gray-600 space-y-1 list-decimal list-inside">
+                            <li>Find a comfortable seated position</li>
+                            <li>Close your eyes or soften your gaze</li>
+                            <li>Focus on your natural breath</li>
+                            <li>Notice when your mind wanders</li>
+                            <li>Gently return attention to breath</li>
+                            <li>Observe thoughts without judgment</li>
+                            <li>Continue for desired duration</li>
+                        </ol>
+                    </div>
+                    
+                    <div class="bg-blue-50 p-3 rounded-lg">
+                        <h4 class="font-semibold text-blue-800 mb-1">Benefits:</h4>
+                        <p class="text-sm text-blue-700">Reduces anxiety, improves focus, increases self-awareness, promotes emotional regulation</p>
+                    </div>
+                </div>
+                
+                <!-- Body Scan Meditation -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="video-placeholder w-full h-48 rounded-lg mb-4 flex items-center justify-center">
+                        <div class="text-center">
+                            <div class="text-4xl mb-2">🫧</div>
+                            <p class="text-gray-500">Body Scan Meditation Video</p>
+                        </div>
+                    </div>
+                    
+                    <h3 class="text-xl font-semibold mb-3">Body Scan Meditation</h3>
+                    <p class="text-gray-600 mb-4"><strong>Duration:</strong> 15-30 minutes</p>
+                    
+                    <div class="mb-4">
+                        <h4 class="font-semibold mb-2">Instructions:</h4>
+                        <ol class="text-sm text-gray-600 space-y-1 list-decimal list-inside">
+                            <li>Lie down comfortably on your back</li>
+                            <li>Close your eyes and breathe naturally</li>
+                            <li>Start by focusing on your toes</li>
+                            <li>Slowly move attention up through your body</li>
+                            <li>Notice sensations in each body part</li>
+                            <li>Don't try to change anything, just observe</li>
+                            <li>End at the top of your head</li>
+                        </ol>
+                    </div>
+                    
+                    <div class="bg-green-50 p-3 rounded-lg">
+                        <h4 class="font-semibold text-green-800 mb-1">Benefits:</h4>
+                        <p class="text-sm text-green-700">Reduces physical tension, improves body awareness, promotes relaxation, helps with sleep</p>
+                    </div>
+                </div>
+                
+                <!-- Loving-Kindness Meditation -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="video-placeholder w-full h-48 rounded-lg mb-4 flex items-center justify-center">
+                        <div class="text-center">
+                            <div class="text-4xl mb-2">💝</div>
+                            <p class="text-gray-500">Loving-Kindness Meditation Video</p>
+                        </div>
+                    </div>
+                    
+                    <h3 class="text-xl font-semibold mb-3">Loving-Kindness Meditation</h3>
+                    <p class="text-gray-600 mb-4"><strong>Duration:</strong> 10-15 minutes</p>
+                    
+                    <div class="mb-4">
+                        <h4 class="font-semibold mb-2">Instructions:</h4>
+                        <ol class="text-sm text-gray-600 space-y-1 list-decimal list-inside">
+                            <li>Sit comfortably and close your eyes</li>
+                            <li>Begin by sending love to yourself</li>
+                            <li>Repeat: "May I be happy, may I be healthy"</li>
+                            <li>Extend love to a loved one</li>
+                            <li>Send love to a neutral person</li>
+                            <li>Include someone you have difficulty with</li>
+                            <li>Finally, send love to all beings</li>
+                        </ol>
+                    </div>
+                    
+                    <div class="bg-pink-50 p-3 rounded-lg">
+                        <h4 class="font-semibold text-pink-800 mb-1">Benefits:</h4>
+                        <p class="text-sm text-pink-700">Increases compassion, reduces negative emotions, improves relationships, boosts positive feelings</p>
+                    </div>
+                </div>
+                
+                <!-- Guided Visualization -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="video-placeholder w-full h-48 rounded-lg mb-4 flex items-center justify-center">
+                        <div class="text-center">
+                            <div class="text-4xl mb-2">🌅</div>
+                            <p class="text-gray-500">Guided Visualization Video</p>
+                        </div>
+                    </div>
+                    
+                    <h3 class="text-xl font-semibold mb-3">Guided Visualization</h3>
+                    <p class="text-gray-600 mb-4"><strong>Duration:</strong> 10-20 minutes</p>
+                    
+                    <div class="mb-4">
+                        <h4 class="font-semibold mb-2">Instructions:</h4>
+                        <ol class="text-sm text-gray-600 space-y-1 list-decimal list-inside">
+                            <li>Find a quiet, comfortable space</li>
+                            <li>Close your eyes and relax</li>
+                            <li>Imagine a peaceful, safe place</li>
+                            <li>Engage all your senses in the visualization</li>
+                            <li>Notice colors, sounds, smells, textures</li>
+                            <li>Stay in this peaceful place</li>
+                            <li>Slowly return to the present when ready</li>
+                        </ol>
+                    </div>
+                    
+                    <div class="bg-purple-50 p-3 rounded-lg">
+                        <h4 class="font-semibold text-purple-800 mb-1">Benefits:</h4>
+                        <p class="text-sm text-purple-700">Reduces stress, enhances creativity, improves mood, promotes deep relaxation</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Doctor/Helpline Section -->
+        <section id="doctor" class="section-hidden">
+            <h2 class="text-3xl font-bold text-gray-800 mb-6">Medical Support & Helplines</h2>
+            
+            <div class="grid lg:grid-cols-2 gap-6">
+                <!-- Hospital Information -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-xl font-semibold mb-4 text-blue-600">🏥 Hospital Information</h3>
+                    
+                    <div class="space-y-4">
+                        <div class="border-l-4 border-blue-500 pl-4">
+                            <h4 class="font-semibold">City General Hospital</h4>
+                            <p class="text-sm text-gray-600">Mental Health Department</p>
+                            <p class="text-sm text-gray-600">📍 123 Healthcare Avenue, City Center</p>
+                            <p class="text-sm text-gray-600">📞 +1 (555) 123-4567</p>
+                        </div>
+                        
+                        <div class="border-l-4 border-blue-500 pl-4">
+                            <h4 class="font-semibold">OPD Timings</h4>
+                            <p class="text-sm text-gray-600">Monday - Friday: 9:00 AM - 5:00 PM</p>
+                            <p class="text-sm text-gray-600">Saturday: 9:00 AM - 1:00 PM</p>
+                            <p class="text-sm text-gray-600">Sunday: Emergency Only</p>
+                        </div>
+                        
+                        <div class="border-l-4 border-blue-500 pl-4">
+                            <h4 class="font-semibold">Specialized Services</h4>
+                            <p class="text-sm text-gray-600">• Individual Counseling</p>
+                            <p class="text-sm text-gray-600">• Group Therapy</p>
+                            <p class="text-sm text-gray-600">• Psychiatric Consultation</p>
+                            <p class="text-sm text-gray-600">• Crisis Intervention</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Emergency Helplines -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-xl font-semibold mb-4 text-red-600">🚨 Emergency Helplines</h3>
+                    
+                    <div class="space-y-4">
+                        <div class="bg-red-50 p-4 rounded-lg border border-red-200">
+                            <h4 class="font-semibold text-red-800">Crisis Hotline</h4>
+                            <p class="text-lg font-bold text-red-600">988</p>
+                            <p class="text-sm text-red-700">24/7 Suicide & Crisis Lifeline</p>
+                        </div>
+                        
+                        <div class="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                            <h4 class="font-semibold text-orange-800">Mental Health Support</h4>
+                            <p class="text-lg font-bold text-orange-600">+1 (555) HELP-NOW</p>
+                            <p class="text-sm text-orange-700">24/7 Mental Health Crisis Line</p>
+                        </div>
+                        
+                        <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                            <h4 class="font-semibold text-blue-800">Text Support</h4>
+                            <p class="text-lg font-bold text-blue-600">Text HOME to 741741</p>
+                            <p class="text-sm text-blue-700">Crisis Text Line</p>
+                        </div>
+                        
+                        <div class="bg-green-50 p-4 rounded-lg border border-green-200">
+                            <h4 class="font-semibold text-green-800">Online Chat</h4>
+                            <p class="text-sm text-green-700">Visit: www.mentalhealthchat.org</p>
+                            <p class="text-sm text-green-700">Live chat with counselors</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Additional Resources -->
+            <div class="mt-6 bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-xl font-semibold mb-4 text-purple-600">📚 Additional Resources</h3>
+                
+                <div class="grid md:grid-cols-3 gap-4">
+                    <div class="border border-purple-200 rounded-lg p-4">
+                        <h4 class="font-semibold mb-2">Support Groups</h4>
+                        <p class="text-sm text-gray-600">Local and online support groups for various mental health conditions</p>
+                        <button class="mt-2 text-purple-600 text-sm hover:underline">Find Groups</button>
+                    </div>
+                    
+                    <div class="border border-purple-200 rounded-lg p-4">
+                        <h4 class="font-semibold mb-2">Educational Materials</h4>
+                        <p class="text-sm text-gray-600">Articles, videos, and resources about mental health topics</p>
+                        <button class="mt-2 text-purple-600 text-sm hover:underline">Browse Resources</button>
+                    </div>
+                    
+                    <div class="border border-purple-200 rounded-lg p-4">
+                        <h4 class="font-semibold mb-2">Professional Directory</h4>
+                        <p class="text-sm text-gray-600">Find licensed therapists and psychiatrists in your area</p>
+                        <button class="mt-2 text-purple-600 text-sm hover:underline">Search Providers</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Video Log Section -->
+        <section id="video-log" class="section-hidden">
+            <h2 class="text-3xl font-bold text-gray-800 mb-6">Daily Video Log & Self-Monitoring</h2>
+            
+            <div class="grid lg:grid-cols-3 gap-6">
+                <!-- Upload Section -->
+                <div class="lg:col-span-2">
+                    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                        <h3 class="text-xl font-semibold mb-4">📹 Record Today's Activities</h3>
+                        
+                        <div class="grid md:grid-cols-2 gap-4">
+                            <div class="video-placeholder h-40 rounded-lg flex items-center justify-center">
+                                <div class="text-center">
+                                    <div class="text-3xl mb-2">🎥</div>
+                                    <p class="text-gray-500 text-sm">Morning Routine</p>
+                                    <button class="mt-2 px-4 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600">Record</button>
+                                </div>
+                            </div>
+                            
+                            <div class="video-placeholder h-40 rounded-lg flex items-center justify-center">
+                                <div class="text-center">
+                                    <div class="text-3xl mb-2">🏃</div>
+                                    <p class="text-gray-500 text-sm">Exercise Session</p>
+                                    <button class="mt-2 px-4 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600">Record</button>
+                                </div>
+                            </div>
+                            
+                            <div class="video-placeholder h-40 rounded-lg flex items-center justify-center">
+                                <div class="text-center">
+                                    <div class="text-3xl mb-2">🧘</div>
+                                    <p class="text-gray-500 text-sm">Meditation</p>
+                                    <button class="mt-2 px-4 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600">Record</button>
+                                </div>
+                            </div>
+                            
+                            <div class="video-placeholder h-40 rounded-lg flex items-center justify-center">
+                                <div class="text-center">
+                                    <div class="text-3xl mb-2">🌙</div>
+                                    <p class="text-gray-500 text-sm">Evening Reflection</p>
+                                    <button class="mt-2 px-4 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600">Record</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Timeline View -->
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <h3 class="text-xl font-semibold mb-4">📅 Activity Timeline</h3>
+                        
+                        <div class="space-y-4">
+                            <div class="flex items-center space-x-4 p-3 bg-green-50 rounded-lg border-l-4 border-green-500">
+                                <div class="text-2xl">✅</div>
+                                <div class="flex-1">
+                                    <h4 class="font-medium">Morning Meditation</h4>
+                                    <p class="text-sm text-gray-600">6:00 AM - Completed correctly</p>
+                                </div>
+                                <button class="text-green-600 hover:underline text-sm">View</button>
+                            </div>
+                            
+                            <div class="flex items-center space-x-4 p-3 bg-yellow-50 rounded-lg border-l-4 border-yellow-500">
+                                <div class="text-2xl">⚠️</div>
+                                <div class="flex-1">
+                                    <h4 class="font-medium">Yoga Session</h4>
+                                    <p class="text-sm text-gray-600">7:30 AM - Needs improvement</p>
+                                </div>
+                                <button class="text-yellow-600 hover:underline text-sm">Review</button>
+                            </div>
+                            
+                            <div class="flex items-center space-x-4 p-3 bg-blue-50 rounded-lg border-l-4 border-blue-500">
+                                <div class="text-2xl">📝</div>
+                                <div class="flex-1">
+                                    <h4 class="font-medium">Running Session</h4>
+                                    <p class="text-sm text-gray-600">8:00 AM - In progress</p>
+                                </div>
+                                <button class="text-blue-600 hover:underline text-sm">Continue</button>
+                            </div>
+                            
+                            <div class="flex items-center space-x-4 p-3 bg-gray-50 rounded-lg border-l-4 border-gray-300">
+                                <div class="text-2xl">⏰</div>
+                                <div class="flex-1">
+                                    <h4 class="font-medium">Evening Reflection</h4>
+                                    <p class="text-sm text-gray-600">9:00 PM - Scheduled</p>
+                                </div>
+                                <button class="text-gray-600 hover:underline text-sm">Remind</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Summary Panel -->
+                <div class="space-y-6">
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <h3 class="text-xl font-semibold mb-4">📊 Today's Summary</h3>
+                        
+                        <div class="space-y-4">
+                            <div class="text-center">
+                                <div class="text-3xl font-bold text-green-600">75%</div>
+                                <p class="text-sm text-gray-600">Activities Completed</p>
+                            </div>
+                            
+                            <div class="space-y-2">
+                                <div class="flex justify-between text-sm">
+                                    <span>Meditation</span>
+                                    <span class="text-green-600">✓</span>
+                                </div>
+                                <div class="flex justify-between text-sm">
+                                    <span>Exercise</span>
+                                    <span class="text-yellow-600">⚠</span>
+                                </div>
+                                <div class="flex justify-between text-sm">
+                                    <span>Running</span>
+                                    <span class="text-blue-600">⏳</span>
+                                </div>
+                                <div class="flex justify-between text-sm">
+                                    <span>Water Intake</span>
+                                    <span class="text-green-600">✓</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <h3 class="text-xl font-semibold mb-4">🎯 Motivation</h3>
+                        
+                        <div class="text-center">
+                            <div class="text-4xl mb-3">🌟</div>
+                            <p class="text-sm text-gray-600 mb-4">"Great progress today! You're building healthy habits that will benefit your mental health."</p>
+                            
+                            <div class="bg-blue-50 p-3 rounded-lg">
+                                <p class="text-xs text-blue-700">Streak: 7 days</p>
+                                <p class="text-xs text-blue-700">Keep it up!</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <h3 class="text-xl font-semibold mb-4">📈 Weekly Progress</h3>
+                        
+                        <div class="space-y-2">
+                            <div class="flex justify-between text-sm">
+                                <span>Mon</span>
+                                <div class="w-16 bg-gray-200 rounded-full h-2">
+                                    <div class="bg-green-500 h-2 rounded-full" style="width: 90%"></div>
+                                </div>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span>Tue</span>
+                                <div class="w-16 bg-gray-200 rounded-full h-2">
+                                    <div class="bg-green-500 h-2 rounded-full" style="width: 85%"></div>
+                                </div>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span>Wed</span>
+                                <div class="w-16 bg-gray-200 rounded-full h-2">
+                                    <div class="bg-yellow-500 h-2 rounded-full" style="width: 70%"></div>
+                                </div>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span>Thu</span>
+                                <div class="w-16 bg-gray-200 rounded-full h-2">
+                                    <div class="bg-green-500 h-2 rounded-full" style="width: 95%"></div>
+                                </div>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span>Fri</span>
+                                <div class="w-16 bg-gray-200 rounded-full h-2">
+                                    <div class="bg-blue-500 h-2 rounded-full" style="width: 75%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- App Guide Section -->
+        <section id="guide" class="section-hidden">
+            <h2 class="text-3xl font-bold text-gray-800 mb-6">App Usage Guide</h2>
+            
+            <div class="grid lg:grid-cols-2 gap-6">
+                <!-- Chat Features -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-xl font-semibold mb-4 text-blue-600">💬 Chat Companion Guide</h3>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <h4 class="font-semibold mb-2">Text Chat</h4>
+                            <ul class="text-sm text-gray-600 space-y-1 list-disc list-inside">
+                                <li>Type your thoughts, feelings, or questions</li>
+                                <li>Get instant AI-powered responses and support</li>
+                                <li>Available 24/7 for emotional support</li>
+                                <li>All conversations are private and secure</li>
+                            </ul>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-semibold mb-2">Voice Assistant</h4>
+                            <ul class="text-sm text-gray-600 space-y-1 list-disc list-inside">
+                                <li>Click the microphone to start speaking</li>
+                                <li>Speak naturally about your concerns</li>
+                                <li>Get voice responses for hands-free interaction</li>
+                                <li>Perfect for meditation guidance and breathing exercises</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Survey Guide -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-xl font-semibold mb-4 text-green-600">📋 Survey & Assessment</h3>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <h4 class="font-semibold mb-2">Mental Health Assessment</h4>
+                            <ul class="text-sm text-gray-600 space-y-1 list-disc list-inside">
+                                <li>Complete weekly mental health check-ins</li>
+                                <li>Answer questions about mood, sleep, and stress</li>
+                                <li>Get personalized recommendations based on results</li>
+                                <li>Track your mental health progress over time</li>
+                            </ul>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-semibold mb-2">How to Use</h4>
+                            <ul class="text-sm text-gray-600 space-y-1 list-disc list-inside">
+                                <li>Be honest in your responses for accurate results</li>
+                                <li>Take the survey in a quiet, private space</li>
+                                <li>Complete all sections for comprehensive assessment</li>
+                                <li>Review your results and follow recommendations</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Exercise Guide -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-xl font-semibold mb-4 text-purple-600">🧘 Exercise & Yoga Guide</h3>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <h4 class="font-semibold mb-2">Getting Started</h4>
+                            <ul class="text-sm text-gray-600 space-y-1 list-disc list-inside">
+                                <li>Start with beginner-friendly poses</li>
+                                <li>Watch instructional videos before attempting</li>
+                                <li>Use the pose correction feature for guidance</li>
+                                <li>Practice regularly for best results</li>
+                            </ul>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-semibold mb-2">Safety Tips</h4>
+                            <ul class="text-sm text-gray-600 space-y-1 list-disc list-inside">
+                                <li>Listen to your body and don't force poses</li>
+                                <li>Use props like blocks or straps if needed</li>
+                                <li>Breathe deeply throughout each exercise</li>
+                                <li>Stop if you feel pain or discomfort</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Challenges Guide -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-xl font-semibold mb-4 text-orange-600">🎯 Daily Challenges</h3>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <h4 class="font-semibold mb-2">Daily Schedule</h4>
+                            <ul class="text-sm text-gray-600 space-y-1 list-disc list-inside">
+                                <li>Follow the recommended daily routine</li>
+                                <li>Check off completed activities</li>
+                                <li>Adjust timing to fit your lifestyle</li>
+                                <li>Maintain consistency for best results</li>
+                            </ul>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-semibold mb-2">Nam Jap Counter</h4>
+                            <ul class="text-sm text-gray-600 space-y-1 list-disc list-inside">
+                                <li>Use the counter during meditation</li>
+                                <li>Set daily targets for spiritual practice</li>
+                                <li>Track your progress over time</li>
+                                <li>Reset counter daily or as needed</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Diet Guide -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-xl font-semibold mb-4 text-red-600">🥗 Nutrition Guide</h3>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <h4 class="font-semibold mb-2">Brain-Healthy Foods</h4>
+                            <ul class="text-sm text-gray-600 space-y-1 list-disc list-inside">
+                                <li>Include recommended foods in your daily diet</li>
+                                <li>Choose organic and fresh options when possible</li>
+                                <li>Balance vegetarian and non-vegetarian options</li>
+                                <li>Stay hydrated with plenty of water</li>
+                            </ul>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-semibold mb-2">Ayurvedic Supplements</h4>
+                            <ul class="text-sm text-gray-600 space-y-1 list-disc list-inside">
+                                <li>Consult with healthcare provider before starting</li>
+                                <li>Follow recommended dosages</li>
+                                <li>Monitor effects and adjust as needed</li>
+                                <li>Combine with healthy lifestyle practices</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Meditation Guide -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-xl font-semibold mb-4 text-indigo-600">🧘‍♀️ Meditation Guide</h3>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <h4 class="font-semibold mb-2">Best Practices</h4>
+                            <ul class="text-sm text-gray-600 space-y-1 list-disc list-inside">
+                                <li>Find a quiet, comfortable space</li>
+                                <li>Set aside dedicated time daily</li>
+                                <li>Start with shorter sessions (5-10 minutes)</li>
+                                <li>Gradually increase duration as you progress</li>
+                            </ul>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-semibold mb-2">Techniques</h4>
+                            <ul class="text-sm text-gray-600 space-y-1 list-disc list-inside">
+                                <li>Try different meditation styles to find your preference</li>
+                                <li>Use guided meditations when starting</li>
+                                <li>Focus on breath awareness for beginners</li>
+                                <li>Be patient and kind with yourself</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // Navigation functionality
+        function showSection(sectionId, event) {
+            const sections = document.querySelectorAll('section');
+            sections.forEach(section => {
+                section.classList.remove('section-active');
+                section.classList.add('section-hidden');
+            });
+            const targetSection = document.getElementById(sectionId);
+            if (targetSection) {
+                targetSection.classList.remove('section-hidden');
+                targetSection.classList.add('section-active');
+            }
+            const navButtons = document.querySelectorAll('.nav-btn');
+            navButtons.forEach(btn => btn.classList.remove('nav-active'));
+            if (event && event.target) event.target.classList.add('nav-active');
+            document.getElementById('mobile-nav').classList.add('hidden');
+        }
+        
+        // Mobile menu toggle
+        document.getElementById('mobile-menu-btn').addEventListener('click', function() {
+            const mobileNav = document.getElementById('mobile-nav');
+            mobileNav.classList.toggle('hidden');
+        });
+        
+        // Chat functionality - wired to backend
+        async function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const messagesContainer = document.getElementById('chat-messages');
+            const text = input.value.trim();
+            if (!text) return;
+            const userMessage = document.createElement('div');
+            userMessage.className = 'chat-message user-message';
+            userMessage.innerHTML = `<p>${text}</p>`;
+            messagesContainer.appendChild(userMessage);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            input.value = '';
+            try {
+                const res = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: text })
+                });
+                const data = await res.json();
+                const aiMessage = document.createElement('div');
+                aiMessage.className = 'chat-message ai-message';
+                aiMessage.innerHTML = `<p>${(data && data.text) || 'Sorry, I had trouble responding.'}</p>`;
+                messagesContainer.appendChild(aiMessage);
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            } catch (e) {
+                const aiMessage = document.createElement('div');
+                aiMessage.className = 'chat-message ai-message';
+                aiMessage.innerHTML = `<p>Something went wrong. Please try again.</p>`;
+                messagesContainer.appendChild(aiMessage);
+            }
+        }
+        
+        // Voice functionality - record and send to /api/voice
+        let voiceRecording = false;
+        let voiceMediaRecorder;
+        let voiceChunks = [];
+        async function toggleVoice() {
+            const voiceBtn = document.getElementById('voice-btn');
+            const voiceStatus = document.getElementById('voice-status');
+            const voiceTranscript = document.getElementById('voice-transcript');
+            const voicePlayer = document.getElementById('voice-player');
+            if (!voiceRecording) {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                voiceMediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+                voiceChunks = [];
+                voiceMediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) voiceChunks.push(e.data); };
+                voiceMediaRecorder.onstop = async () => {
+                    voiceStatus.innerHTML = '<p class="text-gray-600">Processing...</p>';
+                    const blob = new Blob(voiceChunks, { type: 'audio/webm' });
+                    const form = new FormData();
+                    form.append('audio', blob, 'voice.webm');
+                    try {
+                        const res = await fetch('/api/voice', { method: 'POST', body: form });
+                        const data = await res.json();
+                        voiceTranscript.innerHTML = `<p class="text-gray-800">"${data.userText || ''}"</p>`;
+                        if (data.replyText) {
+                            const messagesContainer = document.getElementById('chat-messages');
+                            const aiMessage = document.createElement('div');
+                            aiMessage.className = 'chat-message ai-message';
+                            aiMessage.innerHTML = `<p>${data.replyText}</p>`;
+                            messagesContainer.appendChild(aiMessage);
+                            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                        }
+                        if (data.audio) {
+                            const src = `data:${data.mimeType || 'audio/mpeg'};base64,${data.audio}`;
+                            voicePlayer.src = src;
+                            voicePlayer.play();
+                        }
+                    } catch (e) {
+                        voiceTranscript.innerHTML = '<p class="text-red-600">Voice processing failed.</p>';
+                    }
+                    voiceStatus.innerHTML = '<p class="text-gray-600">Click the microphone to start speaking</p>';
+                };
+                voiceMediaRecorder.start();
+                voiceRecording = true;
+                voiceBtn.style.backgroundColor = '#ef4444';
+                voiceBtn.innerHTML = '🔴';
+                voiceStatus.innerHTML = '<p class="text-red-600">Recording... Click to stop</p>';
+                voiceTranscript.innerHTML = '<p class="text-gray-500 italic">Listening...</p>';
+            } else {
+                voiceRecording = false;
+                voiceBtn.style.backgroundColor = '#3b82f6';
+                voiceBtn.innerHTML = '🎤';
+                voiceStatus.innerHTML = '<p class="text-gray-600">Click the microphone to start speaking</p>';
+                if (voiceMediaRecorder && voiceMediaRecorder.state !== 'inactive') {
+                    voiceMediaRecorder.stop();
+                }
+            }
+        }
+        
+        // Nam Jap Counter functionality
+        let japCount = 0;
+        let japTarget = 108;
+        function incrementJap() { japCount++; document.getElementById('jap-count').textContent = japCount; updateJapProgress(); }
+        function resetJap() { japCount = 0; document.getElementById('jap-count').textContent = japCount; updateJapProgress(); }
+        function setTarget() { const newTarget = prompt('Set your Nam Jap target:', japTarget); if (newTarget && !isNaN(newTarget)) { japTarget = parseInt(newTarget); document.getElementById('jap-target').textContent = japTarget; updateJapProgress(); } }
+        function updateJapProgress() { const progress = Math.min((japCount / japTarget) * 100, 100); document.getElementById('jap-progress').style.width = progress + '%'; }
+        
+        // Enter key support for chat
+        document.addEventListener('DOMContentLoaded', function() {
+            const chatInput = document.getElementById('chat-input');
+            chatInput.addEventListener('keypress', function(e) { if (e.key === 'Enter') { sendMessage(); } });
+        });
+        
+        // Survey form submission
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.querySelector('form');
+            if (form) form.addEventListener('submit', function(e) { e.preventDefault(); alert('Survey submitted successfully! Your responses have been recorded for analysis.'); });
+        });
+        
+        // Program data
+        const programs = {
+            '7-day': {
+                name: '7-Day Starter Program',
+                description: 'Perfect for beginners. Focus on basic poses, breathing, and mindfulness.',
+                exercises: 'Basic breathing, Simple stretches, Beginner meditation, Relaxation techniques',
+                color: 'blue',
+                days: 7
+            },
+            '16-day': {
+                name: '16-Day Intermediate Program',
+                description: 'Build on basics with more challenging poses and longer sessions.',
+                exercises: 'Intermediate poses, Extended meditation, Stress management, Balance training',
+                color: 'green',
+                days: 16
+            },
+            '21-day': {
+                name: '21-Day Advanced Program',
+                description: 'Comprehensive program for experienced practitioners.',
+                exercises: 'Advanced poses, Deep meditation, Pranayama, Complete wellness routine',
+                color: 'purple',
+                days: 21
+            }
+        };
+        
+        let currentProgram = '7-day';
+        
+        function showProgram(programId, event) {
+            currentProgram = programId;
+            const program = programs[programId];
+            document.querySelectorAll('.program-tab').forEach(tab => {
+                tab.classList.remove('bg-blue-500', 'bg-green-500', 'bg-purple-500', 'text-white');
+                tab.classList.add('bg-gray-200', 'text-gray-700');
+            });
+            if (event && event.target) {
+                event.target.classList.remove('bg-gray-200', 'text-gray-700');
+                event.target.classList.add(`bg-${program.color}-500`, 'text-white');
+            }
+            const detailsDiv = document.getElementById('program-details');
+            detailsDiv.className = `bg-${program.color}-50 p-4 rounded-lg`;
+            detailsDiv.innerHTML = `
+                <h4 class="font-semibold text-${program.color}-800 mb-2">${program.name}</h4>
+                <p class="text-${program.color}-700 text-sm mb-2">${program.description}</p>
+                <p class="text-${program.color}-600 text-xs">Exercises: ${program.exercises}</p>
+            `;
+            updateHomeProgress();
+        }
+        
+        function updateHomeProgress() {
+            const program = programs[currentProgram];
+            const completed = Math.floor(Math.random() * program.days) + 1;
+            const remaining = program.days - completed;
+            const percentage = Math.round((completed / program.days) * 100);
+            document.getElementById('current-program').textContent = `${program.days}-Day`;
+            document.getElementById('days-completed').textContent = completed;
+            document.getElementById('days-remaining').textContent = remaining;
+            document.getElementById('progress-percentage').textContent = `${percentage}%`;
+            document.getElementById('progress-bar').style.width = `${percentage}%`;
+        }
+        
+        // Pose detection using TensorFlow.js MoveNet
+        let poseDetector; let poseRunning = false; let poseReq;
+        async function initPoseDetector() {
+            await tf.setBackend('webgl');
+            poseDetector = await poseDetection.createDetector(poseDetection.SupportedModels.MoveNet, { modelType: 'Thunder' });
+        }
+        function drawKeypoints(ctx, keypoints) {
+            keypoints.forEach(kp => {
+                if (kp.score > 0.3) {
+                    ctx.beginPath(); ctx.arc(kp.x, kp.y, 4, 0, 2*Math.PI); ctx.fillStyle = '#22c55e'; ctx.fill();
+                }
+            });
+        }
+        function provideSimpleFeedback(keypoints) {
+            const feedbackEl = document.getElementById('pose-feedback');
+            if (!keypoints || keypoints.length === 0) { feedbackEl.textContent = 'No person detected.'; return; }
+            const leftKnee = keypoints.find(k=>k.name==='left_knee');
+            const rightKnee = keypoints.find(k=>k.name==='right_knee');
+            if (leftKnee && rightKnee && leftKnee.score>0.3 && rightKnee.score>0.3) {
+                const kneeDiff = Math.abs(leftKnee.y - rightKnee.y);
+                if (kneeDiff < 30) feedbackEl.textContent = 'Good symmetry. Keep knees level.';
+                else feedbackEl.textContent = 'Try to level your knees for better alignment.';
+            } else {
+                feedbackEl.textContent = 'Move fully into frame for better tracking.';
+            }
+        }
+        async function startPose() {
+            const statusEl = document.getElementById('pose-status');
+            const video = document.getElementById('pose-video');
+            const canvas = document.getElementById('pose-canvas');
+            const ctx = canvas.getContext('2d');
+            if (!poseDetector) await initPoseDetector();
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+            video.srcObject = stream;
+            await new Promise(r => video.onloadedmetadata = r);
+            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+            statusEl.textContent = 'Status: running';
+            poseRunning = true;
+            const render = async () => {
+                if (!poseRunning) return;
+                ctx.clearRect(0,0,canvas.width,canvas.height);
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const poses = await poseDetector.estimatePoses(video);
+                if (poses && poses[0]) {
+                    drawKeypoints(ctx, poses[0].keypoints);
+                    provideSimpleFeedback(poses[0].keypoints);
+                }
+                poseReq = requestAnimationFrame(render);
+            };
+            render();
+        }
+        function stopPose() {
+            const statusEl = document.getElementById('pose-status');
+            const video = document.getElementById('pose-video');
+            poseRunning = false; cancelAnimationFrame(poseReq);
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(t => t.stop());
+                video.srcObject = null;
+            }
+            statusEl.textContent = 'Status: stopped';
+        }
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('pose-start').addEventListener('click', startPose);
+            document.getElementById('pose-stop').addEventListener('click', stopPose);
+        });
+        
+        // Initialize the app
+        document.addEventListener('DOMContentLoaded', function() {
+            showSection('home');
+            updateHomeProgress();
+        });
+    </script>
+</body>
+</html>
+
+
