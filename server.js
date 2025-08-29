@@ -5,6 +5,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import nodemailer from 'nodemailer';
 
 const app = express();
 app.use(cors());
@@ -29,19 +30,111 @@ const EMERGENCY_RESPONSES = [
   "I'm worried about you, and I want you to stay safe. Please call 988 right now - it's the Suicide Prevention Lifeline, and they have trained counselors available 24/7. You're important, and there are people who want to support you through this difficult time."
 ];
 
-// Emergency notification system (simplified for prototype)
-function sendEmergencyNotification(userMessage) {
+// Email configuration for emergency alerts
+const EMAIL_CONFIG = {
+  recipient: 'sharmajitesh2007@gmail.com', // Hardcoded for demo
+  subject: '🚨 Emergency Alert - Sathi AI Assistant',
+  from: 'sathi-ai@demo.com'
+};
+
+// Create email transporter (using Gmail SMTP for demo)
+const createEmailTransporter = () => {
+  return nodemailer.createTransporter({
+    service: 'gmail',
+    auth: {
+      user: process.env.EMAIL_USER || 'your-email@gmail.com',
+      pass: process.env.EMAIL_PASS || 'your-app-password'
+    }
+  });
+};
+
+// Emergency notification system with real email alerts
+async function sendEmergencyNotification(userMessage) {
   console.log('🚨 EMERGENCY ALERT TRIGGERED 🚨');
   console.log('User message:', userMessage);
-  console.log('📧 Would send email to counselor and parent');
-  console.log('📱 Would send SMS notification');
-  console.log('🔔 Would trigger immediate response system');
+  console.log('📧 Sending email to:', EMAIL_CONFIG.recipient);
   
-  // In a real implementation, you would:
-  // - Send email to counselor and parent
-  // - Send SMS notifications
-  // - Log to emergency response system
-  // - Trigger immediate human intervention
+  try {
+    // Create email transporter
+    const transporter = createEmailTransporter();
+    
+    // Email content
+    const mailOptions = {
+      from: EMAIL_CONFIG.from,
+      to: EMAIL_CONFIG.recipient,
+      subject: EMAIL_CONFIG.subject,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background-color: #dc2626; color: white; padding: 20px; text-align: center;">
+            <h1 style="margin: 0; font-size: 24px;">🚨 EMERGENCY ALERT</h1>
+          </div>
+          
+          <div style="padding: 20px; background-color: #f9fafb;">
+            <h2 style="color: #dc2626; margin-top: 0;">Sathi AI Assistant - Emergency Detection</h2>
+            
+            <div style="background-color: #fef2f2; border-left: 4px solid #dc2626; padding: 15px; margin: 20px 0;">
+              <h3 style="color: #dc2626; margin-top: 0;">⚠️ User Message Detected:</h3>
+              <p style="font-style: italic; color: #374151;">"${userMessage}"</p>
+            </div>
+            
+            <div style="background-color: #ecfdf5; border-left: 4px solid #059669; padding: 15px; margin: 20px 0;">
+              <h3 style="color: #059669; margin-top: 0;">✅ Immediate Actions Taken:</h3>
+              <ul style="color: #374151;">
+                <li>Emergency response message sent to user</li>
+                <li>Helpline information provided (988, Crisis Text Line)</li>
+                <li>Supportive resources shared</li>
+                <li>This alert email sent to counselor</li>
+              </ul>
+            </div>
+            
+            <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 15px; margin: 20px 0;">
+              <h3 style="color: #3b82f6; margin-top: 0;">📞 Emergency Helplines:</h3>
+              <p style="color: #374151; margin: 5px 0;"><strong>Suicide Prevention Lifeline:</strong> 988</p>
+              <p style="color: #374151; margin: 5px 0;"><strong>Crisis Text Line:</strong> Text HOME to 741741</p>
+              <p style="color: #374151; margin: 5px 0;"><strong>Available:</strong> 24/7</p>
+            </div>
+            
+            <div style="background-color: #fef3c7; border-left: 4px solid #d97706; padding: 15px; margin: 20px 0;">
+              <h3 style="color: #d97706; margin-top: 0;">⚠️ Next Steps:</h3>
+              <ul style="color: #374151;">
+                <li>Review the user's message for severity</li>
+                <li>Consider immediate intervention if needed</li>
+                <li>Follow up with appropriate support resources</li>
+                <li>Document the incident for future reference</li>
+              </ul>
+            </div>
+            
+            <div style="text-align: center; margin-top: 30px; padding: 15px; background-color: #f3f4f6;">
+              <p style="color: #6b7280; margin: 0; font-size: 12px;">
+                This is an automated alert from Sathi AI Assistant.<br>
+                Timestamp: ${new Date().toLocaleString()}<br>
+                System: Emergency Safety Protocol v1.0
+              </p>
+            </div>
+          </div>
+        </div>
+      `
+    };
+    
+    // Send email
+    const info = await transporter.sendMail(mailOptions);
+    console.log('✅ Emergency email sent successfully');
+    console.log('📧 Message ID:', info.messageId);
+    
+    return { success: true, messageId: info.messageId };
+    
+  } catch (error) {
+    console.error('❌ Failed to send emergency email:', error.message);
+    
+    // Fallback: Log to console for demo purposes
+    console.log('📧 EMAIL CONTENT (Demo Mode):');
+    console.log('To:', EMAIL_CONFIG.recipient);
+    console.log('Subject:', EMAIL_CONFIG.subject);
+    console.log('Body: Emergency alert triggered for user message containing suicidal/self-harm content');
+    console.log('User message:', userMessage);
+    
+    return { success: false, error: error.message };
+  }
 }
 
 // Check for emergency keywords
@@ -83,17 +176,18 @@ app.get('/health', (req, res) => {
 });
 
 // Emergency notification endpoint (for demo purposes)
-app.post('/api/emergency', (req, res) => {
+app.post('/api/emergency', async (req, res) => {
   const { message, userInfo } = req.body;
   console.log('🚨 Emergency notification received:', { message, userInfo });
   
-  // Simulate emergency response
-  sendEmergencyNotification(message);
+  // Send real emergency email
+  const result = await sendEmergencyNotification(message);
   
   res.json({ 
-    success: true, 
-    message: 'Emergency notification sent',
-    timestamp: new Date().toISOString()
+    success: result.success, 
+    message: result.success ? 'Emergency email sent successfully' : 'Emergency email failed, but logged',
+    timestamp: new Date().toISOString(),
+    emailSent: result.success
   });
 });
 
@@ -112,8 +206,14 @@ app.post('/api/chat', async (req, res) => {
     if (checkForEmergency(message)) {
       console.log('🚨 EMERGENCY DETECTED - Providing immediate support');
       
-      // Send emergency notification
-      sendEmergencyNotification(message);
+      // Send emergency notification (async)
+      sendEmergencyNotification(message).then(result => {
+        if (result.success) {
+          console.log('✅ Emergency email sent successfully');
+        } else {
+          console.log('⚠️ Emergency email failed, but user support provided');
+        }
+      });
       
       // Return emergency response
       const emergencyResponse = EMERGENCY_RESPONSES[Math.floor(Math.random() * EMERGENCY_RESPONSES.length)];
@@ -213,8 +313,14 @@ app.post('/api/voice', async (req, res) => {
     if (checkForEmergency(message)) {
       console.log('🚨 EMERGENCY DETECTED in voice input - Providing immediate support');
       
-      // Send emergency notification
-      sendEmergencyNotification(message);
+      // Send emergency notification (async)
+      sendEmergencyNotification(message).then(result => {
+        if (result.success) {
+          console.log('✅ Emergency email sent successfully');
+        } else {
+          console.log('⚠️ Emergency email failed, but user support provided');
+        }
+      });
       
       // Return emergency response
       const emergencyResponse = EMERGENCY_RESPONSES[Math.floor(Math.random() * EMERGENCY_RESPONSES.length)];
@@ -258,6 +364,8 @@ app.listen(PORT, () => {
   console.log(`🎤 Picovoice Key: ${process.env.PICOVOICE_ACCESS_KEY ? '✅ Set' : '❌ Missing'}`);
   console.log(`🤖 Gemini Client: ${genAI ? '✅ Ready' : '❌ Not available'}`);
   console.log(`🚨 Emergency Safety System: ✅ Active`);
+  console.log(`📧 Emergency Email: ${EMAIL_CONFIG.recipient}`);
+  console.log(`📧 Email Config: ${process.env.EMAIL_USER ? '✅ Set' : '❌ Missing (will use demo mode)'}`);
 });
 
 

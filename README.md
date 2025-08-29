@@ -10,6 +10,7 @@ A voice-enabled AI mental health companion built with Node.js, Gemini AI, and Pi
 - 🌙 **Dark Mode**: Toggle between light and dark themes
 - 📱 **Responsive Design**: Works on desktop and mobile
 - 🔒 **Privacy-Focused**: Uses Picovoice for offline voice processing
+- 🚨 **Emergency Safety System**: Detects suicidal/self-harm keywords and sends email alerts
 
 ## Quick Start
 
@@ -18,6 +19,10 @@ Create a `.env` file:
 ```env
 GEMINI_API_KEY=your_gemini_api_key_here
 PICOVOICE_ACCESS_KEY=WRE4wcoNmd30qFyA8xA4NHBnWKe3t5FMxbW0wZCADhGSO3mu8/0R9Q==
+
+# Email Configuration (for emergency alerts)
+EMAIL_USER=your-email@gmail.com
+EMAIL_PASS=your-app-password
 ```
 
 ### 2. Install Dependencies
@@ -33,6 +38,13 @@ npm start
 ### 4. Access the App
 - **Main App**: http://localhost:3001
 - **Voice Assistant**: http://localhost:3001/voice-chat.html
+
+### 5. Email Setup (Optional)
+For emergency email alerts, set up Gmail:
+1. Enable 2-factor authentication on your Gmail
+2. Generate an App Password (Google Account → Security → App Passwords)
+3. Add to `.env`: `EMAIL_USER=your-email@gmail.com` and `EMAIL_PASS=your-app-password`
+4. Emergency alerts will be sent to: `sharmajitesh2007@gmail.com`
 
 ## Usage
 
@@ -71,6 +83,8 @@ npm start
 ### Environment Variables for Render:
 - `GEMINI_API_KEY`: Your Google Gemini API key
 - `PICOVOICE_ACCESS_KEY`: Your Picovoice access key
+- `EMAIL_USER`: Your Gmail address for emergency alerts
+- `EMAIL_PASS`: Your Gmail app password (not regular password)
 - `PORT`: 3001 (or let Render set it)
 
 ## Browser Support
