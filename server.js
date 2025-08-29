@@ -43,18 +43,18 @@ app.post('/api/chat', async (req, res) => {
     
     if (!message || message.trim() === '') {
       return res.json({ 
-        reply: "Hello! I'm your Sathi companion. How can I help you today?" 
+        reply: "Hey there! I'm Sathi, your supportive study buddy and wellness companion. How are you feeling today? I'm here to help with stress, study tips, or just to chat! 🌟" 
       });
     }
 
     // If Gemini is not available, use fallback responses
     if (!genAI) {
       const fallbackResponses = [
-        "I understand you're reaching out. While I'm having technical difficulties, remember that you're not alone. Consider talking to a friend, family member, or mental health professional.",
-        "Thank you for sharing. I'm currently experiencing some issues, but I want you to know that your feelings are valid. Take a deep breath and know that this moment will pass.",
-        "I hear you. Even though I can't respond properly right now, please remember to be kind to yourself. You're doing the best you can.",
-        "Your message is important. While I'm temporarily unavailable, try some deep breathing exercises: inhale for 4 counts, hold for 4, exhale for 6.",
-        "I'm here for you, even if I can't respond as usual. Remember that seeking help is a sign of strength, not weakness."
+        "Hey there! I'm having some technical issues right now, but I want you to know your feelings matter. Try taking 3 deep breaths - inhale for 4, hold for 4, exhale for 6. You've got this! 💪",
+        "Thanks for reaching out! While I'm temporarily unavailable, remember to stay hydrated and take short study breaks. A 5-minute walk or some gentle stretching can work wonders for your mood.",
+        "I hear you, and I care about how you're feeling. Even though I can't respond properly right now, try journaling your thoughts or doing some face yoga - it's amazing how much it helps!",
+        "Your message is important to me. While I'm experiencing some issues, try the Pomodoro technique: 25 minutes of focused work, then a 5-minute break. It's a game-changer for student stress!",
+        "I'm here for you, even if I can't respond as usual. Remember to get 7-9 hours of sleep tonight and maybe try some magnesium-rich foods like nuts or dark chocolate for natural stress relief."
       ];
       const randomResponse = fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
       return res.json({ reply: randomResponse });
@@ -65,7 +65,31 @@ app.post('/api/chat', async (req, res) => {
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     const result = await model.generateContent([
       {
-        text: "You are Sathi, a compassionate mental health companion. Provide supportive, helpful responses focused on mental wellness, stress management, and emotional support. Keep responses concise but warm and encouraging."
+        text: `You are Sathi, a supportive and empathetic mental health companion for students. Your role is to provide practical, actionable advice and emotional support.
+
+IMPORTANT GUIDELINES:
+1. NEVER suggest visiting a psychiatrist or doctor unless the user explicitly asks about medical treatment or shows serious suicidal/harmful intent.
+
+2. ALWAYS provide supportive, actionable advice focused on:
+   • Breathing exercises: Anulom Vilom, deep breathing (4-4-6 pattern), face yoga, progressive muscle relaxation
+   • Nutritional support: zinc, magnesium, iron, vitamin B12, proper hydration, balanced meals
+   • Stress management: journaling, meditation, daily walks, yoga, mindfulness exercises
+   • Positive routines: sleep schedule (7-9 hours), study breaks (Pomodoro technique), screen-time control, morning routines
+
+3. Keep your tone:
+   • Friendly, motivating, and empathetic like a supportive mentor
+   • Student-focused and practical
+   • Encouraging and solution-oriented
+   • Warm and understanding
+
+4. For serious concerns (suicidal thoughts, self-harm):
+   • First provide immediate emotional support and safety suggestions
+   • Then gently suggest professional help as a supportive option
+   • Always prioritize the user's safety and wellbeing
+
+5. Keep responses concise (2-3 sentences) but warm and encouraging.
+
+Remember: You're a supportive friend and mentor, not a medical professional. Focus on practical wellness strategies that students can implement immediately.`
       },
       {
         text: message
@@ -82,9 +106,9 @@ app.post('/api/chat', async (req, res) => {
     
     // Provide helpful fallback response
     const errorResponses = [
-      "I'm having trouble connecting right now, but I want you to know that your feelings matter. Try taking a few deep breaths and remember that this moment is temporary.",
-      "I'm experiencing some technical difficulties, but please know that you're not alone. Consider reaching out to someone you trust or a mental health professional.",
-      "I can't respond properly at the moment, but I care about your wellbeing. Remember to be gentle with yourself today."
+      "Hey! I'm having some connection issues, but your feelings are totally valid. Try this quick stress-buster: close your eyes and take 3 deep breaths. You're doing great! 🌟",
+      "Thanks for reaching out! While I'm experiencing some technical difficulties, remember to stay hydrated and maybe try some gentle neck stretches. Small self-care moments make a big difference!",
+      "I care about how you're feeling, even if I can't respond properly right now. Try the 5-4-3-2-1 grounding technique: name 5 things you see, 4 you can touch, 3 you hear, 2 you smell, 1 you taste. It really helps!"
     ];
     
     const fallbackResponse = errorResponses[Math.floor(Math.random() * errorResponses.length)];
@@ -99,7 +123,7 @@ app.post('/api/voice', async (req, res) => {
     
     if (!message) {
       return res.json({ 
-        replyText: "Hello! I'm your voice assistant. How can I help you today?" 
+        replyText: "Hey there! I'm Sathi, your voice-enabled study buddy. How are you feeling today? I'm here to help with stress, study tips, or just to chat! 🌟" 
       });
     }
 
