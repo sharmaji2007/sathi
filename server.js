@@ -4,7 +4,7 @@ import cors from 'cors';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import OpenAI from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const app = express();
 app.use(cors());
@@ -13,32 +13,30 @@ app.use(express.urlencoded({ extended: true }));
 
 const upload = multer({ dest: 'uploads/' });
 
-// Initialize OpenAI with better error handling
-let openai = null;
+// Initialize Gemini with better error handling
+let genAI = null;
 try {
-  if (process.env.OPENAI_API_KEY) {
-    openai = new OpenAI({ 
-      apiKey: process.env.OPENAI_API_KEY.trim() // Trim whitespace
-    });
-    console.log('✅ OpenAI initialized successfully');
+  if (process.env.GEMINI_API_KEY) {
+    genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY.trim());
+    console.log('✅ Gemini initialized successfully');
   } else {
-    console.log('⚠️ No OpenAI API key found - using fallback responses');
+    console.log('⚠️ No Gemini API key found - using fallback responses');
   }
 } catch (error) {
-  console.error('❌ Error initializing OpenAI:', error);
+  console.error('❌ Error initializing Gemini:', error);
 }
 
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ 
     ok: true, 
-    hasApiKey: !!process.env.OPENAI_API_KEY,
-    apiKeyLength: process.env.OPENAI_API_KEY ? process.env.OPENAI_API_KEY.length : 0,
-    openaiInitialized: !!openai
+    hasGeminiKey: !!process.env.GEMINI_API_KEY,
+    hasPicovoiceKey: !!process.env.PICOVOICE_ACCESS_KEY,
+    geminiInitialized: !!genAI
   });
 });
 
-// Simple chat endpoint with fallback responses
+// Chat endpoint with Gemini
 app.post('/api/chat', async (req, res) => {
   try {
     const { message } = req.body || {};
@@ -49,8 +47,8 @@ app.post('/api/chat', async (req, res) => {
       });
     }
 
-    // If OpenAI is not available, use fallback responses
-    if (!openai) {
+    // If Gemini is not available, use fallback responses
+    if (!genAI) {
       const fallbackResponses = [
         "I understand you're reaching out. While I'm having technical difficulties, remember that you're not alone. Consider talking to a friend, family member, or mental health professional.",
         "Thank you for sharing. I'm currently experiencing some issues, but I want you to know that your feelings are valid. Take a deep breath and know that this moment will pass.",
@@ -62,26 +60,20 @@ app.post('/api/chat', async (req, res) => {
       return res.json({ reply: randomResponse });
     }
 
-    console.log('🤖 Making OpenAI API call for:', message.substring(0, 50) + '...');
+    console.log('🤖 Making Gemini API call for:', message.substring(0, 50) + '...');
     
-    const response = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo', // Use more reliable model
-      messages: [
-        {
-          role: 'system',
-          content: 'You are Sathi, a compassionate mental health companion. Provide supportive, helpful responses focused on mental wellness, stress management, and emotional support. Keep responses concise but warm and encouraging.'
-        },
-        {
-          role: 'user',
-          content: message
-        }
-      ],
-      temperature: 0.7,
-      max_tokens: 150
-    });
-
-    const reply = response.choices?.[0]?.message?.content || 'I understand. How are you feeling right now?';
-    console.log('✅ OpenAI response received');
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const result = await model.generateContent([
+      {
+        text: "You are Sathi, a compassionate mental health companion. Provide supportive, helpful responses focused on mental wellness, stress management, and emotional support. Keep responses concise but warm and encouraging."
+      },
+      {
+        text: message
+      }
+    ]);
+    
+    const reply = result.response.text() || 'I understand. How are you feeling right now?';
+    console.log('✅ Gemini response received');
     
     res.json({ reply });
     
@@ -100,7 +92,7 @@ app.post('/api/chat', async (req, res) => {
   }
 });
 
-// Simple voice endpoint (text-only for now)
+// Voice endpoint (text-only for now)
 app.post('/api/voice', async (req, res) => {
   try {
     const { message } = req.body || {};
@@ -111,7 +103,7 @@ app.post('/api/voice', async (req, res) => {
       });
     }
 
-    // For now, just use the chat endpoint
+    // Use the chat endpoint
     const chatResponse = await fetch('http://localhost:3001/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -135,8 +127,9 @@ app.use(express.static('public'));
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
-  console.log(`🔑 OpenAI API Key: ${process.env.OPENAI_API_KEY ? '✅ Set' : '❌ Missing'}`);
-  console.log(`🤖 OpenAI Client: ${openai ? '✅ Ready' : '❌ Not available'}`);
+  console.log(`🔑 Gemini API Key: ${process.env.GEMINI_API_KEY ? '✅ Set' : '❌ Missing'}`);
+  console.log(`🎤 Picovoice Key: ${process.env.PICOVOICE_ACCESS_KEY ? '✅ Set' : '❌ Missing'}`);
+  console.log(`🤖 Gemini Client: ${genAI ? '✅ Ready' : '❌ Not available'}`);
 });
 
 

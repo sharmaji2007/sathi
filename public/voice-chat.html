@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sathi Voice Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@picovoice/web-voice-processor@latest/dist/iife/index.js"></script>
+    <script src="https://unpkg.com/@picovoice/porcupine-web@latest/dist/iife/index.js"></script>
+    <style>
+        .typing-animation {
+            display: inline-block;
+            overflow: hidden;
+            border-right: 2px solid #3b82f6;
+            white-space: nowrap;
+            animation: typing 3s steps(40, end), blink-caret 0.75s step-end infinite;
+        }
+        @keyframes typing {
+            from { width: 0; }
+            to { width: 100%; }
+        }
+        @keyframes blink-caret {
+            from, to { border-color: transparent; }
+            50% { border-color: #3b82f6; }
+        }
+        .pulse-ring {
+            animation: pulse-ring 1.5s cubic-bezier(0.455, 0.03, 0.515, 0.955) infinite;
+        }
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); opacity: 1; }
+            80%, 100% { transform: scale(2); opacity: 0; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen transition-colors duration-300" id="body">
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <div class="flex items-center justify-center mb-4">
+                <div class="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center mr-3">
+                    <span class="text-white font-bold text-xl">🧠</span>
+                </div>
+                <h1 class="text-3xl font-bold text-gray-800">Sathi Voice Assistant</h1>
+            </div>
+            <p class="text-gray-600">Your AI mental health companion with voice capabilities</p>
+        </div>
+
+        <!-- Status Indicator -->
+        <div class="bg-white rounded-lg shadow-md p-4 mb-6">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div id="status-indicator" class="w-3 h-3 bg-red-500 rounded-full"></div>
+                    <span id="status-text" class="text-sm font-medium text-gray-700">🔴 Listening Off</span>
+                </div>
+                <button id="dark-mode-toggle" class="px-3 py-1 bg-gray-200 rounded-lg text-sm hover:bg-gray-300 transition-colors">
+                    🌙 Dark Mode
+                </button>
+            </div>
+        </div>
+
+        <!-- Chat Window -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-xl font-semibold text-gray-800">Chat</h2>
+                <button id="clear-chat" class="text-sm text-gray-500 hover:text-gray-700">Clear Chat</button>
+            </div>
+            <div id="chat-messages" class="h-96 overflow-y-auto mb-4 p-4 bg-gray-50 rounded-lg">
+                <div class="chat-message ai-message mb-4">
+                    <div class="flex items-start space-x-3">
+                        <div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                            <span class="text-white text-sm">🧠</span>
+                        </div>
+                        <div class="flex-1">
+                            <p class="text-gray-800">Hello! I'm Sathi, your voice-enabled mental health companion. Say "Hey Sathi" to activate me, or click the microphone button to start chatting!</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Voice Controls -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="text-center">
+                <div class="mb-6">
+                    <button id="mic-button" class="w-20 h-20 bg-blue-500 hover:bg-blue-600 rounded-full flex items-center justify-center text-white text-2xl transition-all duration-300 shadow-lg hover:shadow-xl">
+                        🎤
+                    </button>
+                    <div id="pulse-ring" class="w-20 h-20 rounded-full bg-blue-500 opacity-20 absolute hidden"></div>
+                </div>
+                <div id="voice-status" class="mb-4">
+                    <p class="text-gray-600">Click the microphone to start speaking</p>
+                </div>
+                <div id="voice-transcript" class="p-4 bg-gray-50 rounded-lg min-h-16">
+                    <p class="text-gray-500 italic">Your spoken words will appear here...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Text Input (Fallback) -->
+        <div class="bg-white rounded-lg shadow-md p-6 mt-6">
+            <div class="flex space-x-2">
+                <input type="text" id="text-input" placeholder="Type your message..." class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <button id="send-button" class="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Picovoice Configuration
+        const PICOVOICE_ACCESS_KEY = 'WRE4wcoNmd30qFyA8xA4NHBnWKe3t5FMxbW0wZCADhGSO3mu8/0R9Q==';
+        
+        // DOM Elements
+        const micButton = document.getElementById('mic-button');
+        const voiceStatus = document.getElementById('voice-status');
+        const voiceTranscript = document.getElementById('voice-transcript');
+        const chatMessages = document.getElementById('chat-messages');
+        const textInput = document.getElementById('text-input');
+        const sendButton = document.getElementById('send-button');
+        const statusIndicator = document.getElementById('status-indicator');
+        const statusText = document.getElementById('status-text');
+        const darkModeToggle = document.getElementById('dark-mode-toggle');
+        const clearChatButton = document.getElementById('clear-chat');
+        const body = document.getElementById('body');
+
+        // State
+        let isListening = false;
+        let isDarkMode = false;
+        let voiceProcessor = null;
+        let porcupine = null;
+
+        // Dark Mode Toggle
+        darkModeToggle.addEventListener('click', () => {
+            isDarkMode = !isDarkMode;
+            if (isDarkMode) {
+                body.classList.add('dark');
+                body.classList.add('bg-gray-900');
+                document.querySelectorAll('.bg-white').forEach(el => {
+                    el.classList.remove('bg-white');
+                    el.classList.add('bg-gray-800');
+                });
+                document.querySelectorAll('.text-gray-800').forEach(el => {
+                    el.classList.remove('text-gray-800');
+                    el.classList.add('text-gray-200');
+                });
+                darkModeToggle.textContent = '☀️ Light Mode';
+            } else {
+                body.classList.remove('dark', 'bg-gray-900');
+                document.querySelectorAll('.bg-gray-800').forEach(el => {
+                    el.classList.remove('bg-gray-800');
+                    el.classList.add('bg-white');
+                });
+                document.querySelectorAll('.text-gray-200').forEach(el => {
+                    el.classList.remove('text-gray-200');
+                    el.classList.add('text-gray-800');
+                });
+                darkModeToggle.textContent = '🌙 Dark Mode';
+            }
+        });
+
+        // Clear Chat
+        clearChatButton.addEventListener('click', () => {
+            chatMessages.innerHTML = `
+                <div class="chat-message ai-message mb-4">
+                    <div class="flex items-start space-x-3">
+                        <div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                            <span class="text-white text-sm">🧠</span>
+                        </div>
+                        <div class="flex-1">
+                            <p class="text-gray-800">Chat cleared. How can I help you today?</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        // Text Input
+        sendButton.addEventListener('click', sendTextMessage);
+        textInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendTextMessage();
+            }
+        });
+
+        function sendTextMessage() {
+            const message = textInput.value.trim();
+            if (!message) return;
+            
+            addMessage(message, 'user');
+            textInput.value = '';
+            
+            // Send to backend
+            sendToBackend(message);
+        }
+
+        // Voice Processing
+        async function initializePicovoice() {
+            try {
+                // Initialize Porcupine for wake word detection
+                porcupine = await Porcupine.create(PICOVOICE_ACCESS_KEY, {
+                    keywords: ['picovoice', 'hey sathi'],
+                    processErrorCallback: (error) => {
+                        console.error('Porcupine error:', error);
+                    }
+                });
+
+                // Initialize voice processor
+                voiceProcessor = new WebVoiceProcessor.WebVoiceProcessor({
+                    porcupine: porcupine,
+                    processErrorCallback: (error) => {
+                        console.error('Voice processor error:', error);
+                    }
+                });
+
+                console.log('✅ Picovoice initialized successfully');
+                updateStatus('🟢 Ready to Listen', 'bg-green-500');
+            } catch (error) {
+                console.error('❌ Failed to initialize Picovoice:', error);
+                updateStatus('🔴 Voice Unavailable', 'bg-red-500');
+            }
+        }
+
+        // Microphone Button
+        micButton.addEventListener('click', async () => {
+            if (!isListening) {
+                await startListening();
+            } else {
+                stopListening();
+            }
+        });
+
+        async function startListening() {
+            if (!voiceProcessor) {
+                await initializePicovoice();
+            }
+
+            try {
+                await voiceProcessor.start();
+                isListening = true;
+                micButton.style.backgroundColor = '#ef4444';
+                micButton.innerHTML = '🔴';
+                voiceStatus.innerHTML = '<p class="text-red-600">Listening... Click to stop</p>';
+                voiceTranscript.innerHTML = '<p class="text-gray-500 italic">Listening...</p>';
+                updateStatus('🟢 Listening Active', 'bg-green-500');
+                
+                // Add pulse animation
+                const pulseRing = document.getElementById('pulse-ring');
+                pulseRing.classList.remove('hidden');
+                pulseRing.classList.add('pulse-ring');
+            } catch (error) {
+                console.error('Failed to start listening:', error);
+                updateStatus('🔴 Error Starting', 'bg-red-500');
+            }
+        }
+
+        function stopListening() {
+            if (voiceProcessor) {
+                voiceProcessor.stop();
+            }
+            isListening = false;
+            micButton.style.backgroundColor = '#3b82f6';
+            micButton.innerHTML = '🎤';
+            voiceStatus.innerHTML = '<p class="text-gray-600">Click the microphone to start speaking</p>';
+            updateStatus('🔴 Listening Off', 'bg-red-500');
+            
+            // Remove pulse animation
+            const pulseRing = document.getElementById('pulse-ring');
+            pulseRing.classList.add('hidden');
+            pulseRing.classList.remove('pulse-ring');
+        }
+
+        function updateStatus(text, colorClass) {
+            statusText.textContent = text;
+            statusIndicator.className = `w-3 h-3 ${colorClass} rounded-full`;
+        }
+
+        function addMessage(content, sender) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `chat-message ${sender}-message mb-4`;
+            
+            const icon = sender === 'user' ? '👤' : '🧠';
+            const bgColor = sender === 'user' ? 'bg-green-500' : 'bg-blue-500';
+            
+            messageDiv.innerHTML = `
+                <div class="flex items-start space-x-3 ${sender === 'user' ? 'flex-row-reverse space-x-reverse' : ''}">
+                    <div class="w-8 h-8 ${bgColor} rounded-full flex items-center justify-center">
+                        <span class="text-white text-sm">${icon}</span>
+                    </div>
+                    <div class="flex-1 ${sender === 'user' ? 'text-right' : ''}">
+                        <p class="text-gray-800">${content}</p>
+                    </div>
+                </div>
+            `;
+            
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        async function sendToBackend(message) {
+            try {
+                // Show typing indicator
+                const typingDiv = document.createElement('div');
+                typingDiv.className = 'chat-message ai-message mb-4';
+                typingDiv.innerHTML = `
+                    <div class="flex items-start space-x-3">
+                        <div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                            <span class="text-white text-sm">🧠</span>
+                        </div>
+                        <div class="flex-1">
+                            <p class="text-gray-800 typing-animation">🤔 Thinking...</p>
+                        </div>
+                    </div>
+                `;
+                chatMessages.appendChild(typingDiv);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message })
+                });
+
+                const data = await response.json();
+                
+                // Remove typing indicator
+                chatMessages.removeChild(typingDiv);
+                
+                // Add AI response
+                addMessage(data.reply, 'ai');
+                
+                // Speak the response
+                speakText(data.reply);
+                
+            } catch (error) {
+                console.error('Error sending message:', error);
+                addMessage('Sorry, I encountered an error. Please try again.', 'ai');
+            }
+        }
+
+        // Text-to-Speech
+        function speakText(text) {
+            if ('speechSynthesis' in window) {
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.rate = 0.9;
+                utterance.pitch = 1;
+                utterance.volume = 0.8;
+                speechSynthesis.speak(utterance);
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            updateStatus('🔴 Initializing...', 'bg-yellow-500');
+            
+            // Check if browser supports speech recognition
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                updateStatus('🔴 Voice Not Supported', 'bg-red-500');
+                voiceStatus.innerHTML = '<p class="text-red-600">Voice recognition not supported in this browser</p>';
+            } else {
+                updateStatus('🔴 Ready to Start', 'bg-yellow-500');
+            }
+        });
+    </script>
+</body>
+</html>
