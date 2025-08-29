@@ -1603,29 +1603,28 @@
             }
         }
         
-        // Voice functionality - record and send to /api/voice
+        // Simplified voice functionality
         let voiceRecording = false;
-        let voiceMediaRecorder;
-        let voiceChunks = [];
         async function toggleVoice() {
             const voiceBtn = document.getElementById('voice-btn');
             const voiceStatus = document.getElementById('voice-status');
             const voiceTranscript = document.getElementById('voice-transcript');
-            const voicePlayer = document.getElementById('voice-player');
+            
             if (!voiceRecording) {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                voiceMediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-                voiceChunks = [];
-                voiceMediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) voiceChunks.push(e.data); };
-                voiceMediaRecorder.onstop = async () => {
+                // For now, just simulate voice input with a prompt
+                const userInput = prompt("What would you like to say? (Voice input coming soon)");
+                if (userInput) {
                     voiceStatus.innerHTML = '<p class="text-gray-600">Processing...</p>';
-                    const blob = new Blob(voiceChunks, { type: 'audio/webm' });
-                    const form = new FormData();
-                    form.append('audio', blob, 'voice.webm');
+                    voiceTranscript.innerHTML = `<p class="text-gray-800">"${userInput}"</p>`;
+                    
                     try {
-                        const res = await fetch('/api/voice', { method: 'POST', body: form });
+                        const res = await fetch('/api/voice', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ message: userInput })
+                        });
+                        
                         const data = await res.json();
-                        voiceTranscript.innerHTML = `<p class="text-gray-800">"${data.userText || ''}"</p>`;
                         if (data.replyText) {
                             const messagesContainer = document.getElementById('chat-messages');
                             const aiMessage = document.createElement('div');
@@ -1634,31 +1633,12 @@
                             messagesContainer.appendChild(aiMessage);
                             messagesContainer.scrollTop = messagesContainer.scrollHeight;
                         }
-                        if (data.audio) {
-                            const src = `data:${data.mimeType || 'audio/mpeg'};base64,${data.audio}`;
-                            voicePlayer.src = src;
-                            voicePlayer.play();
-                        }
                     } catch (e) {
                         console.error('Voice processing error:', e);
                         voiceTranscript.innerHTML = '<p class="text-red-600">Voice processing failed. Please try again.</p>';
                     }
-                    voiceStatus.innerHTML = '<p class="text-gray-600">Click the microphone to start speaking</p>';
-                };
-                voiceMediaRecorder.start();
-                voiceRecording = true;
-                voiceBtn.style.backgroundColor = '#ef4444';
-                voiceBtn.innerHTML = '🔴';
-                voiceStatus.innerHTML = '<p class="text-red-600">Recording... Click to stop</p>';
-                voiceTranscript.innerHTML = '<p class="text-gray-500 italic">Listening...</p>';
-            } else {
-                voiceRecording = false;
-                voiceBtn.style.backgroundColor = '#3b82f6';
-                voiceBtn.innerHTML = '🎤';
-                voiceStatus.innerHTML = '<p class="text-gray-600">Click the microphone to start speaking</p>';
-                if (voiceMediaRecorder && voiceMediaRecorder.state !== 'inactive') {
-                    voiceMediaRecorder.stop();
                 }
+                voiceStatus.innerHTML = '<p class="text-gray-600">Click the microphone to start speaking</p>';
             }
         }
         

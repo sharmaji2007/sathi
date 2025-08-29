@@ -13,135 +13,119 @@ app.use(express.urlencoded({ extended: true }));
 
 const upload = multer({ dest: 'uploads/' });
 
-// Check if OpenAI API key is configured
-if (!process.env.OPENAI_API_KEY) {
-  console.error('❌ OPENAI_API_KEY environment variable is not set!');
-  console.error('Please set your OpenAI API key in Render environment variables.');
+// Initialize OpenAI with better error handling
+let openai = null;
+try {
+  if (process.env.OPENAI_API_KEY) {
+    openai = new OpenAI({ 
+      apiKey: process.env.OPENAI_API_KEY.trim() // Trim whitespace
+    });
+    console.log('✅ OpenAI initialized successfully');
+  } else {
+    console.log('⚠️ No OpenAI API key found - using fallback responses');
+  }
+} catch (error) {
+  console.error('❌ Error initializing OpenAI:', error);
 }
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
+// Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ 
     ok: true, 
     hasApiKey: !!process.env.OPENAI_API_KEY,
-    apiKeyLength: process.env.OPENAI_API_KEY ? process.env.OPENAI_API_KEY.length : 0
+    apiKeyLength: process.env.OPENAI_API_KEY ? process.env.OPENAI_API_KEY.length : 0,
+    openaiInitialized: !!openai
   });
 });
 
-// Speech-to-Text: Accepts audio (webm/ogg/wav/m4a/mp3), returns transcript text
-app.post('/api/stt', upload.single('audio'), async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'Missing audio file' });
-    }
-
-    const transcription = await openai.audio.transcriptions.create({
-      file: fs.createReadStream(req.file.path),
-      model: 'gpt-4o-transcribe',
-      // Fallback models: 'whisper-1' (if available)
-    });
-
-    // Cleanup uploaded file
-    fs.unlink(req.file.path, () => {});
-    res.json({ text: transcription.text });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Transcription failed' });
-  }
-});
-
-// Chat: Accepts {message, history}, returns assistant text
+// Simple chat endpoint with fallback responses
 app.post('/api/chat', async (req, res) => {
   try {
-    if (!process.env.OPENAI_API_KEY) {
-      return res.status(500).json({ 
-        error: 'OpenAI API key not configured. Please set OPENAI_API_KEY in environment variables.',
-        reply: 'I apologize, but I cannot respond right now. The AI service is not properly configured. Please contact the administrator.'
+    const { message } = req.body || {};
+    
+    if (!message || message.trim() === '') {
+      return res.json({ 
+        reply: "Hello! I'm your Sathi companion. How can I help you today?" 
       });
     }
 
-    const { message, history } = req.body || {};
-    const messages = [
-      ...(Array.isArray(history) ? history : []),
-      { role: 'user', content: message || '' }
-    ];
+    // If OpenAI is not available, use fallback responses
+    if (!openai) {
+      const fallbackResponses = [
+        "I understand you're reaching out. While I'm having technical difficulties, remember that you're not alone. Consider talking to a friend, family member, or mental health professional.",
+        "Thank you for sharing. I'm currently experiencing some issues, but I want you to know that your feelings are valid. Take a deep breath and know that this moment will pass.",
+        "I hear you. Even though I can't respond properly right now, please remember to be kind to yourself. You're doing the best you can.",
+        "Your message is important. While I'm temporarily unavailable, try some deep breathing exercises: inhale for 4 counts, hold for 4, exhale for 6.",
+        "I'm here for you, even if I can't respond as usual. Remember that seeking help is a sign of strength, not weakness."
+      ];
+      const randomResponse = fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
+      return res.json({ reply: randomResponse });
+    }
 
-    console.log('Making OpenAI API call...');
+    console.log('🤖 Making OpenAI API call for:', message.substring(0, 50) + '...');
+    
     const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages,
-      temperature: 0.7
+      model: 'gpt-3.5-turbo', // Use more reliable model
+      messages: [
+        {
+          role: 'system',
+          content: 'You are Sathi, a compassionate mental health companion. Provide supportive, helpful responses focused on mental wellness, stress management, and emotional support. Keep responses concise but warm and encouraging.'
+        },
+        {
+          role: 'user',
+          content: message
+        }
+      ],
+      temperature: 0.7,
+      max_tokens: 150
     });
 
-    const reply = response.choices?.[0]?.message?.content || '';
-    console.log('OpenAI response received:', reply.substring(0, 50) + '...');
+    const reply = response.choices?.[0]?.message?.content || 'I understand. How are you feeling right now?';
+    console.log('✅ OpenAI response received');
+    
     res.json({ reply });
-  } catch (err) {
-    console.error('Chat API Error:', err);
-    res.status(500).json({ 
-      error: 'Chat failed', 
-      reply: 'I apologize, but I encountered an error. Please try again later.'
-    });
+    
+  } catch (error) {
+    console.error('❌ Chat API Error:', error.message);
+    
+    // Provide helpful fallback response
+    const errorResponses = [
+      "I'm having trouble connecting right now, but I want you to know that your feelings matter. Try taking a few deep breaths and remember that this moment is temporary.",
+      "I'm experiencing some technical difficulties, but please know that you're not alone. Consider reaching out to someone you trust or a mental health professional.",
+      "I can't respond properly at the moment, but I care about your wellbeing. Remember to be gentle with yourself today."
+    ];
+    
+    const fallbackResponse = errorResponses[Math.floor(Math.random() * errorResponses.length)];
+    res.json({ reply: fallbackResponse });
   }
 });
 
-// Text-to-Speech: Accepts {text, voice}, returns audio base64 (mp3)
-app.post('/api/tts', async (req, res) => {
+// Simple voice endpoint (text-only for now)
+app.post('/api/voice', async (req, res) => {
   try {
-    const { text, voice } = req.body || {};
-    if (!text) return res.status(400).json({ error: 'Missing text' });
+    const { message } = req.body || {};
+    
+    if (!message) {
+      return res.json({ 
+        replyText: "Hello! I'm your voice assistant. How can I help you today?" 
+      });
+    }
 
-    const speech = await openai.audio.speech.create({
-      model: 'gpt-4o-mini-tts',
-      voice: voice || 'alloy',
-      input: text,
-      format: 'mp3'
+    // For now, just use the chat endpoint
+    const chatResponse = await fetch('http://localhost:3001/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message })
     });
-
-    const audioBuffer = Buffer.from(await speech.arrayBuffer());
-    const base64 = audioBuffer.toString('base64');
-    res.json({ audio: base64, mimeType: 'audio/mpeg' });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'TTS failed' });
-  }
-});
-
-// Combined Voice endpoint: accepts audio, does STT->Chat->TTS
-app.post('/api/voice', upload.single('audio'), async (req, res) => {
-  try {
-    if (!req.file) return res.status(400).json({ error: 'Missing audio file' });
-
-    const transcription = await openai.audio.transcriptions.create({
-      file: fs.createReadStream(req.file.path),
-      model: 'gpt-4o-transcribe'
+    
+    const data = await chatResponse.json();
+    res.json({ replyText: data.reply });
+    
+  } catch (error) {
+    console.error('❌ Voice API Error:', error.message);
+    res.json({ 
+      replyText: "I'm having trouble with voice processing right now. Please try the text chat instead." 
     });
-    const userText = transcription.text || '';
-
-    const chat = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [{ role: 'user', content: userText }],
-      temperature: 0.7
-    });
-    const replyText = chat.choices?.[0]?.message?.content || '';
-
-    const speech = await openai.audio.speech.create({
-      model: 'gpt-4o-mini-tts',
-      voice: 'alloy',
-      input: replyText,
-      format: 'mp3'
-    });
-
-    const audioBuffer = Buffer.from(await speech.arrayBuffer());
-    const base64 = audioBuffer.toString('base64');
-
-    fs.unlink(req.file.path, () => {});
-    res.json({ userText, replyText, audio: base64, mimeType: 'audio/mpeg' });
-  } catch (err) {
-    console.error(err);
-    if (req.file?.path) fs.unlink(req.file.path, () => {});
-    res.status(500).json({ error: 'Voice flow failed' });
   }
 });
 
@@ -149,6 +133,10 @@ app.post('/api/voice', upload.single('audio'), async (req, res) => {
 app.use(express.static('public'));
 
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => console.log(`Server listening on http://localhost:${PORT}`));
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log(`🔑 OpenAI API Key: ${process.env.OPENAI_API_KEY ? '✅ Set' : '❌ Missing'}`);
+  console.log(`🤖 OpenAI Client: ${openai ? '✅ Ready' : '❌ Not available'}`);
+});
 
 
