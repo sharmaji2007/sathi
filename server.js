@@ -13,6 +13,51 @@ app.use(express.urlencoded({ extended: true }));
 
 const upload = multer({ dest: 'uploads/' });
 
+// Emergency Safety System
+const EMERGENCY_KEYWORDS = [
+  'suicide', 'kill myself', 'end my life', 'want to die', 'better off dead',
+  'self harm', 'cut myself', 'hurt myself', 'no reason to live',
+  'everyone would be better', 'no one cares', 'worthless', 'hopeless',
+  'give up', 'can\'t take it anymore', 'tired of living', 'end it all',
+  'suicidal', 'self-harm', 'self harm', 'cutting', 'overdose', 'poison',
+  'hang myself', 'jump off', 'crash car', 'gun', 'pills', 'bleed out'
+];
+
+const EMERGENCY_RESPONSES = [
+  "I'm really concerned about what you're saying. You matter, and your life has value. Please call the National Suicide Prevention Lifeline at 988 or text HOME to 741741 for immediate support. You're not alone, and there are people who care about you and want to help.",
+  "I hear how much pain you're in, and I want you to know that you don't have to go through this alone. Please reach out to the Crisis Text Line by texting HOME to 741741, or call 988 for the Suicide Prevention Lifeline. Your feelings are valid, and help is available 24/7.",
+  "I'm worried about you, and I want you to stay safe. Please call 988 right now - it's the Suicide Prevention Lifeline, and they have trained counselors available 24/7. You're important, and there are people who want to support you through this difficult time."
+];
+
+// Emergency notification system (simplified for prototype)
+function sendEmergencyNotification(userMessage) {
+  console.log('🚨 EMERGENCY ALERT TRIGGERED 🚨');
+  console.log('User message:', userMessage);
+  console.log('📧 Would send email to counselor and parent');
+  console.log('📱 Would send SMS notification');
+  console.log('🔔 Would trigger immediate response system');
+  
+  // In a real implementation, you would:
+  // - Send email to counselor and parent
+  // - Send SMS notifications
+  // - Log to emergency response system
+  // - Trigger immediate human intervention
+}
+
+// Check for emergency keywords
+function checkForEmergency(message) {
+  const lowerMessage = message.toLowerCase();
+  const detectedKeywords = EMERGENCY_KEYWORDS.filter(keyword => 
+    lowerMessage.includes(keyword.toLowerCase())
+  );
+  
+  if (detectedKeywords.length > 0) {
+    console.log('⚠️ Emergency keywords detected:', detectedKeywords);
+    return true;
+  }
+  return false;
+}
+
 // Initialize Gemini with better error handling
 let genAI = null;
 try {
@@ -32,11 +77,27 @@ app.get('/health', (req, res) => {
     ok: true, 
     hasGeminiKey: !!process.env.GEMINI_API_KEY,
     hasPicovoiceKey: !!process.env.PICOVOICE_ACCESS_KEY,
-    geminiInitialized: !!genAI
+    geminiInitialized: !!genAI,
+    emergencySystem: 'active'
   });
 });
 
-// Chat endpoint with Gemini
+// Emergency notification endpoint (for demo purposes)
+app.post('/api/emergency', (req, res) => {
+  const { message, userInfo } = req.body;
+  console.log('🚨 Emergency notification received:', { message, userInfo });
+  
+  // Simulate emergency response
+  sendEmergencyNotification(message);
+  
+  res.json({ 
+    success: true, 
+    message: 'Emergency notification sent',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Chat endpoint with Gemini and emergency safety
 app.post('/api/chat', async (req, res) => {
   try {
     const { message } = req.body || {};
@@ -44,6 +105,27 @@ app.post('/api/chat', async (req, res) => {
     if (!message || message.trim() === '') {
       return res.json({ 
         reply: "Hey there! I'm Sathi, your supportive study buddy and wellness companion. How are you feeling today? I'm here to help with stress, study tips, or just to chat! 🌟" 
+      });
+    }
+
+    // 🚨 EMERGENCY SAFETY CHECK
+    if (checkForEmergency(message)) {
+      console.log('🚨 EMERGENCY DETECTED - Providing immediate support');
+      
+      // Send emergency notification
+      sendEmergencyNotification(message);
+      
+      // Return emergency response
+      const emergencyResponse = EMERGENCY_RESPONSES[Math.floor(Math.random() * EMERGENCY_RESPONSES.length)];
+      
+      return res.json({ 
+        reply: emergencyResponse,
+        emergency: true,
+        helpline: {
+          suicide_prevention: '988',
+          crisis_text: '741741',
+          message: 'Text HOME to 741741 or call 988 for immediate support'
+        }
       });
     }
 
@@ -127,6 +209,27 @@ app.post('/api/voice', async (req, res) => {
       });
     }
 
+    // 🚨 EMERGENCY SAFETY CHECK for voice
+    if (checkForEmergency(message)) {
+      console.log('🚨 EMERGENCY DETECTED in voice input - Providing immediate support');
+      
+      // Send emergency notification
+      sendEmergencyNotification(message);
+      
+      // Return emergency response
+      const emergencyResponse = EMERGENCY_RESPONSES[Math.floor(Math.random() * EMERGENCY_RESPONSES.length)];
+      
+      return res.json({ 
+        replyText: emergencyResponse,
+        emergency: true,
+        helpline: {
+          suicide_prevention: '988',
+          crisis_text: '741741',
+          message: 'Text HOME to 741741 or call 988 for immediate support'
+        }
+      });
+    }
+
     // Use the chat endpoint
     const chatResponse = await fetch('http://localhost:3001/api/chat', {
       method: 'POST',
@@ -154,6 +257,7 @@ app.listen(PORT, () => {
   console.log(`🔑 Gemini API Key: ${process.env.GEMINI_API_KEY ? '✅ Set' : '❌ Missing'}`);
   console.log(`🎤 Picovoice Key: ${process.env.PICOVOICE_ACCESS_KEY ? '✅ Set' : '❌ Missing'}`);
   console.log(`🤖 Gemini Client: ${genAI ? '✅ Ready' : '❌ Not available'}`);
+  console.log(`🚨 Emergency Safety System: ✅ Active`);
 });
 
 
